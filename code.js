@@ -202,55 +202,69 @@ function deleteSelected() {
 // Set selected element to absolute position within autolayout
 function setToAbsolute() {
   var selection = figma.currentPage.selection;
-  
+
   if (selection.length === 0) {
     figma.ui.postMessage({ type: 'error', text: 'Please select an element first' });
     return;
   }
-  
+
   var count = 0;
   var processedNodes = [];
-  
+  var skippedSections = 0;
+
   for (var i = 0; i < selection.length; i++) {
     var node = selection[i];
+
+    // Skip sections - they cannot be set to absolute positioning
+    if (node.type === 'SECTION') {
+      skippedSections++;
+      continue;
+    }
+
     var parent = node.parent;
-    
+
     if (!parent) continue;
-    
+
     var isInAutolayout = 'layoutMode' in parent && parent.layoutMode !== 'NONE';
-    
+
     if (isInAutolayout) {
       if ('layoutPositioning' in node) {
         node.layoutPositioning = 'ABSOLUTE';
         node.x = 0;
         node.y = 0;
-        
+
         if ('constraints' in node) {
           node.constraints = { horizontal: 'MIN', vertical: 'MIN' };
         }
-        
+
         count++;
         processedNodes.push(node);
       }
     } else {
       node.y = 0;
       node.x = 0;
-      
+
       if ('constraints' in node) {
         node.constraints = { horizontal: 'MIN', vertical: 'MIN' };
       }
-      
+
       count++;
       processedNodes.push(node);
     }
   }
-  
+
   if (processedNodes.length > 0) {
     figma.currentPage.selection = processedNodes;
   }
-  
+
   if (count > 0) {
-    figma.ui.postMessage({ type: 'success', text: 'Set ' + count + ' element(s) to absolute position' });
+    var message = 'Set ' + count + ' element(s) to absolute position';
+    if (skippedSections > 0) {
+      message += ' (skipped ' + skippedSections + ' section(s))';
+    }
+    figma.ui.postMessage({ type: 'success', text: message });
+  } else if (skippedSections > 0) {
+    figma.ui.postMessage({ type: 'error', text: 'Sections cannot be set to absolute position' });
   } else {
     figma.ui.postMessage({ type: 'error', text: 'Could not set to absolute position' });
   }
@@ -422,11 +436,48 @@ function alignElements(position) {
   }
 }
 
+// Helper function to remove absolute elements from a container (frame or section)
+function removeAbsoluteFromContainer(container, removed) {
+  if (!('children' in container)) return removed;
+
+  var children = container.children;
+
+  // Iterate backwards when removing
+  for (var i = children.length - 1; i >= 0; i--) {
+    var child = children[i];
+
+    // If child is a section, recursively search its frames
+    if (child.type === 'SECTION' && 'children' in child) {
+      removed = removeAbsoluteFromContainer(child, removed);
+    }
+    // If child is a frame, search for absolute elements
+    else if ('children' in child) {
+      var frameChildren = child.children;
+      for (var j = frameChildren.length - 1; j >= 0; j--) {
+        var frameChild = frameChildren[j];
+        var isAbsolute = 'layoutPositioning' in frameChild && frameChild.layoutPositioning === 'ABSOLUTE';
+
+        if (isAbsolute) {
+          try {
+            frameChild.remove();
+            removed++;
+          } catch (e) {
+            // ignore individual removal errors
+          }
+        }
+      }
+    }
+  }
+
+  return removed;
+}
+
 // Remove absolute-positioned components
-// Works in 3 ways:
+// Works in 4 ways:
 // 1. If absolute elements are selected: removes those elements
-// 2. If frames are selected: removes absolute elements within those frames
-// 3. If nothing is selected: removes all absolute elements from the page
+// 2. If sections are selected: removes absolute elements from all frames within those sections
+// 3. If frames are selected: removes absolute elements within those frames
+// 4. If nothing is selected: removes all absolute elements from all sections and frames on the page
 function removeAbsoluteComponents() {
   var selection = figma.currentPage.selection;
   var removed = 0;
@@ -465,38 +516,53 @@ function removeAbsoluteComponents() {
     }
   }
 
-  // Case 2 & 3: Frames selected or nothing selected
-  var framesToSearch = [];
+  // Case 2, 3 & 4: Sections/Frames selected or nothing selected
+  var containersToSearch = [];
   var searchScope = '';
 
   if (selection.length === 0) {
-    // No selection: search all frames on the page
-    framesToSearch = figma.currentPage.children;
+    // No selection: search all sections and frames on the page
+    containersToSearch = figma.currentPage.children;
     searchScope = 'on page';
   } else {
-    // Selection exists: search within selected frames
-    framesToSearch = selection;
-    searchScope = 'in selected frames';
+    // Selection exists: could be sections or frames
+    containersToSearch = selection;
+
+    // Check if any sections are in selection
+    var hasSections = false;
+    for (var i = 0; i < selection.length; i++) {
+      if (selection[i].type === 'SECTION') {
+        hasSections = true;
+        break;
+      }
+    }
+
+    searchScope = hasSections ? 'in selected sections' : 'in selected frames';
   }
 
-  for (var s = 0; s < framesToSearch.length; s++) {
-    var parentFrame = framesToSearch[s];
-    if (!('children' in parentFrame)) continue;
-    var children = parentFrame.children;
+  // Process each container
+  for (var s = 0; s < containersToSearch.length; s++) {
+    var container = containersToSearch[s];
 
-    // Iterate backwards when removing
-    for (var i = children.length - 1; i >= 0; i--) {
-      var child = children[i];
+    // If it's a section, use helper to recursively process
+    if (container.type === 'SECTION') {
+      removed = removeAbsoluteFromContainer(container, removed);
+    }
+    // If it's a frame, search its children for absolute elements
+    else if ('children' in container) {
+      var children = container.children;
 
-      // Check if child is absolutely positioned
-      var isAbsolute = 'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE';
+      for (var i = children.length - 1; i >= 0; i--) {
+        var child = children[i];
+        var isAbsolute = 'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE';
 
-      if (isAbsolute) {
-        try {
-          child.remove();
-          removed++;
-        } catch (e) {
-          // ignore individual removal errors
+        if (isAbsolute) {
+          try {
+            child.remove();
+            removed++;
+          } catch (e) {
+            // ignore individual removal errors
+          }
         }
       }
     }
