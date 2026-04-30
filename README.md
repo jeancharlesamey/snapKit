@@ -1,4 +1,4 @@
-# SnapKit v0.0.3-alpha
+# SnapKit v0.0.4-alpha
 
 A Figma plugin for managing prototype elements with absolute positioning, alignment, and component selection.
 
@@ -13,7 +13,7 @@ A Figma plugin for managing prototype elements with absolute positioning, alignm
 - Smart search: searches within selected frames, or all page frames if nothing is selected
 
 ### Layout Management
-- **Duplicate selected** - Clone elements with automatic 20px offset
+- **Duplicate selected** - Clone elements placed immediately next to the original (in autolayout flow, or to the right for absolute/free elements)
 - **Set to absolute** - Convert elements to absolute positioning (perfect for sticky headers and fixed navigation)
 - **Set fixed scroll** - Currently disabled due to Figma API limitations
 
@@ -22,7 +22,10 @@ Quickly align elements with 6 convenient buttons organized in 2 rows:
 - **Row 1 (Horizontal)**: Left, Center, Right
 - **Row 2 (Vertical)**: Top, Middle, Bottom
 
-All alignment tools automatically set elements to absolute positioning when needed.
+Alignment adapts to the selected element's context:
+- **Autolayout frame** selected → changes the frame's own internal alignment (`primaryAxisAlignItems` / `counterAxisAlignItems`)
+- **Non-absolute child** inside an autolayout → changes `layoutAlign` on the child (cross-axis only)
+- **Absolute element** or regular frame child → moves via x/y position
 
 ### Cleanup
 - **Remove absolute** - Smart removal that works 3 ways:
@@ -78,10 +81,24 @@ All alignment tools automatically set elements to absolute positioning when need
 - **Selection matters**: Most buttons become enabled/disabled based on your current selection
 - **Comma-separated names**: Search for multiple components at once (e.g., "Header, TapBar, Footer")
 - **Sections support**: Remove Absolute now works with Figma sections—it searches all frames within sections
-- **Alignment is smart**: Alignment tools automatically convert elements to absolute positioning in autolayout frames
+- **Alignment is context-aware**: Aligning an autolayout frame changes its internal alignment; aligning a child inside autolayout changes its cross-axis alignment; aligning an absolute element moves it via x/y
 
 
 ## RELEASE NOTES
+
+### v0.0.4-alpha (April 30, 2026)
+**Improvements:**
+- Improved: Alignment buttons are now context-aware — no longer forces elements to absolute positioning
+  - Autolayout frames: updates `primaryAxisAlignItems` / `counterAxisAlignItems`
+  - Non-absolute children in autolayout: updates `layoutAlign` (cross-axis only)
+  - Absolute elements and regular frame children: moves via x/y, preserves the other axis's constraint
+- Improved: Duplicate now places the clone next to the original — in autolayout flow (index + 1) or immediately to the right (x + width + 8px) for absolute/free elements
+- Improved: Component search (Select Component, Select Absolute) is now recursive — finds components nested inside sections and sub-frames, not just direct children
+
+**Fixes:**
+- Fixed: Alignment buttons no longer reset both constraint axes to MIN — only the aligned axis is updated
+- Fixed: Four `var i` redeclarations in Remove Absolute function (linter warnings)
+- Fixed: Misleading code comment on name-deduplication break statement
 
 ### v0.0.3-alpha (February 5, 2026)
 **Improvements:**
@@ -130,4 +147,4 @@ For issues or feedback, please contact the plugin maintainer via github.
 
 ---
 
-**Current Version**: v0.0.3-alpha (in development)
+**Current Version**: v0.0.4-alpha (in development)
