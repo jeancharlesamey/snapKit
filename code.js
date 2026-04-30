@@ -11,6 +11,45 @@ figma.on('selectionchange', function() {
   figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection });
 });
 
+// Recursively find children matching any of the given names
+function findByName(container, names, results) {
+  if (!('children' in container)) return;
+  var children = container.children;
+  for (var i = 0; i < children.length; i++) {
+    var child = children[i];
+    for (var n = 0; n < names.length; n++) {
+      if (child.name === names[n]) {
+        results.push(child);
+        break; // prevent double-push if the same name appears twice in input
+      }
+    }
+    if ('children' in child) {
+      findByName(child, names, results);
+    }
+  }
+}
+
+// Recursively find absolute-positioned children matching any of the given names
+function findAbsoluteByName(container, names, results) {
+  if (!('children' in container)) return;
+  var children = container.children;
+  for (var i = 0; i < children.length; i++) {
+    var child = children[i];
+    var isAbsolute = 'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE';
+    if (isAbsolute) {
+      for (var n = 0; n < names.length; n++) {
+        if (child.name === names[n]) {
+          results.push(child);
+          break; // prevent double-push if the same name appears twice in input
+        }
+      }
+    }
+    if ('children' in child) {
+      findAbsoluteByName(child, names, results);
+    }
+  }
+}
+
 // Select a frame by name within selected frames or all page frames
 // Supports multiple names separated by commas (e.g., "Header, TapBar")
 function selectFrameByName(nameInput) {
@@ -41,23 +80,7 @@ function selectFrameByName(nameInput) {
   var foundFrames = [];
 
   for (var s = 0; s < framesToSearch.length; s++) {
-    var parentFrame = framesToSearch[s];
-
-    if (!('children' in parentFrame)) {
-      continue;
-    }
-
-    var children = parentFrame.children;
-
-    for (var i = 0; i < children.length; i++) {
-      // Check if child name matches any of the provided names
-      for (var n = 0; n < names.length; n++) {
-        if (children[i].name === names[n]) {
-          foundFrames.push(children[i]);
-          break; // Avoid duplicates if same component matches multiple times
-        }
-      }
-    }
+    findByName(framesToSearch[s], names, foundFrames);
   }
 
   // Create display text for names
@@ -103,28 +126,7 @@ function selectAbsoluteByName(nameInput) {
   var foundFrames = [];
 
   for (var s = 0; s < framesToSearch.length; s++) {
-    var parentFrame = framesToSearch[s];
-
-    if (!('children' in parentFrame)) {
-      continue;
-    }
-
-    var children = parentFrame.children;
-
-    for (var i = 0; i < children.length; i++) {
-      // Check if child is absolute-positioned
-      var isAbsolute = 'layoutPositioning' in children[i] && children[i].layoutPositioning === 'ABSOLUTE';
-
-      if (isAbsolute) {
-        // Check if child name matches any of the provided names
-        for (var n = 0; n < names.length; n++) {
-          if (children[i].name === names[n]) {
-            foundFrames.push(children[i]);
-            break; // Avoid duplicates if same component matches multiple times
-          }
-        }
-      }
-    }
+    findAbsoluteByName(framesToSearch[s], names, foundFrames);
   }
 
   // Create display text for names
@@ -152,13 +154,27 @@ function duplicateSelected() {
 
   for (var i = 0; i < selection.length; i++) {
     var node = selection[i];
-    if ('clone' in node) {
-      var dup = node.clone();
-      dup.x = node.x + 20;
-      dup.y = node.y + 20;
-      node.parent.appendChild(dup);
-      duplicated.push(dup);
+    if (!('clone' in node)) continue;
+
+    var parent = node.parent;
+    var dup = node.clone(); // clone() appends to end of parent.children automatically
+
+    if (parent) {
+      var isInAutolayout = 'layoutMode' in parent && parent.layoutMode !== 'NONE';
+      var isAbsolute = 'layoutPositioning' in node && node.layoutPositioning === 'ABSOLUTE';
+
+      if (isInAutolayout && !isAbsolute) {
+        // Move clone to right after the original in the autolayout flow
+        var nodeIndex = parent.children.indexOf(node);
+        parent.insertChild(nodeIndex + 1, dup);
+      } else {
+        // Absolute or no autolayout: place immediately to the right of the original
+        dup.x = node.x + node.width + 8;
+        dup.y = node.y;
+      }
     }
+
+    duplicated.push(dup);
   }
 
   if (duplicated.length > 0) {
@@ -341,94 +357,90 @@ function setFixedScroll() {
 // Align selected elements to a specific position
 function alignElements(position) {
   var selection = figma.currentPage.selection;
-  
+
   if (selection.length === 0) {
     figma.ui.postMessage({ type: 'error', text: 'Please select an element first' });
     return;
   }
-  
+
   var count = 0;
-  
+
   for (var i = 0; i < selection.length; i++) {
     var node = selection[i];
     var parent = node.parent;
-    
+
     if (!parent) continue;
-    
-    var isInAutolayout = 'layoutMode' in parent && parent.layoutMode !== 'NONE';
-    
-    if (isInAutolayout) {
-      if ('layoutPositioning' in node) {
-        node.layoutPositioning = 'ABSOLUTE';
+
+    var nodeIsAutolayout = 'layoutMode' in node && node.layoutMode !== 'NONE';
+    var nodeIsAbsolute = 'layoutPositioning' in node && node.layoutPositioning === 'ABSOLUTE';
+    var parentIsAutolayout = 'layoutMode' in parent && parent.layoutMode !== 'NONE';
+
+    if (nodeIsAutolayout) {
+      // Node is itself an autolayout container: change its internal alignment properties
+      var isHorizontal = node.layoutMode === 'HORIZONTAL';
+      if (isHorizontal) {
+        // Primary axis = horizontal, counter axis = vertical
+        if (position === 'left')        { node.primaryAxisAlignItems = 'MIN';    count++; }
+        else if (position === 'center') { node.primaryAxisAlignItems = 'CENTER'; count++; }
+        else if (position === 'right')  { node.primaryAxisAlignItems = 'MAX';    count++; }
+        else if (position === 'top')    { node.counterAxisAlignItems = 'MIN';    count++; }
+        else if (position === 'middle') { node.counterAxisAlignItems = 'CENTER'; count++; }
+        else if (position === 'bottom') { node.counterAxisAlignItems = 'MAX';    count++; }
+      } else {
+        // VERTICAL layout — primary axis = vertical, counter axis = horizontal
+        if (position === 'top')         { node.primaryAxisAlignItems = 'MIN';    count++; }
+        else if (position === 'middle') { node.primaryAxisAlignItems = 'CENTER'; count++; }
+        else if (position === 'bottom') { node.primaryAxisAlignItems = 'MAX';    count++; }
+        else if (position === 'left')   { node.counterAxisAlignItems = 'MIN';    count++; }
+        else if (position === 'center') { node.counterAxisAlignItems = 'CENTER'; count++; }
+        else if (position === 'right')  { node.counterAxisAlignItems = 'MAX';    count++; }
       }
-      
+    } else if (parentIsAutolayout && !nodeIsAbsolute) {
+      // Non-absolute child inside an autolayout: use layoutAlign for cross-axis only.
+      // Primary-axis position is not controllable per-child — skip silently.
+      if (!('layoutAlign' in node)) continue;
+      var parentIsHorizontal = parent.layoutMode === 'HORIZONTAL';
+      if (parentIsHorizontal) {
+        if (position === 'top')         { node.layoutAlign = 'MIN';    count++; }
+        else if (position === 'middle') { node.layoutAlign = 'CENTER'; count++; }
+        else if (position === 'bottom') { node.layoutAlign = 'MAX';    count++; }
+      } else {
+        if (position === 'left')        { node.layoutAlign = 'MIN';    count++; }
+        else if (position === 'center') { node.layoutAlign = 'CENTER'; count++; }
+        else if (position === 'right')  { node.layoutAlign = 'MAX';    count++; }
+      }
+    } else {
+      // Absolute element or regular frame child: position via x/y.
+      // Only update the aligned axis; preserve the other axis's constraint.
       var parentWidth = parent.width;
       var parentHeight = parent.height;
-      
+      var curH = ('constraints' in node) ? node.constraints.horizontal : 'MIN';
+      var curV = ('constraints' in node) ? node.constraints.vertical : 'MIN';
+
       if (position === 'top') {
         node.y = 0;
-        node.x = 0;
-        if ('constraints' in node) {
-          node.constraints = { horizontal: 'MIN', vertical: 'MIN' };
-        }
+        if ('constraints' in node) { node.constraints = { horizontal: curH, vertical: 'MIN' }; }
       } else if (position === 'middle') {
         node.y = (parentHeight - node.height) / 2;
-        node.x = 0;
-        if ('constraints' in node) {
-          node.constraints = { horizontal: 'MIN', vertical: 'CENTER' };
-        }
+        if ('constraints' in node) { node.constraints = { horizontal: curH, vertical: 'CENTER' }; }
       } else if (position === 'bottom') {
         node.y = parentHeight - node.height;
-        node.x = 0;
-        if ('constraints' in node) {
-          node.constraints = { horizontal: 'MIN', vertical: 'MAX' };
-        }
+        if ('constraints' in node) { node.constraints = { horizontal: curH, vertical: 'MAX' }; }
       } else if (position === 'left') {
         node.x = 0;
-        node.y = 0;
-        if ('constraints' in node) {
-          node.constraints = { horizontal: 'MIN', vertical: 'MIN' };
-        }
+        if ('constraints' in node) { node.constraints = { horizontal: 'MIN', vertical: curV }; }
       } else if (position === 'center') {
         node.x = (parentWidth - node.width) / 2;
-        node.y = 0;
-        if ('constraints' in node) {
-          node.constraints = { horizontal: 'CENTER', vertical: 'MIN' };
-        }
+        if ('constraints' in node) { node.constraints = { horizontal: 'CENTER', vertical: curV }; }
       } else if (position === 'right') {
         node.x = parentWidth - node.width;
-        node.y = 0;
-        if ('constraints' in node) {
-          node.constraints = { horizontal: 'MAX', vertical: 'MIN' };
-        }
+        if ('constraints' in node) { node.constraints = { horizontal: 'MAX', vertical: curV }; }
       }
-      
-      count++;
-    } else {
-      if (position === 'top') {
-        node.y = 0;
-        node.x = 0;
-      } else if (position === 'middle') {
-        node.y = (parent.height - node.height) / 2;
-        node.x = 0;
-      } else if (position === 'bottom') {
-        node.y = parent.height - node.height;
-        node.x = 0;
-      } else if (position === 'left') {
-        node.x = 0;
-        node.y = 0;
-      } else if (position === 'center') {
-        node.x = (parent.width - node.width) / 2;
-        node.y = 0;
-      } else if (position === 'right') {
-        node.x = parent.width - node.width;
-        node.y = 0;
-      }
-      
+
       count++;
     }
   }
-  
+
   if (count > 0) {
     figma.ui.postMessage({ type: 'success', text: 'Aligned ' + count + ' element(s)' });
   } else {
@@ -496,10 +508,10 @@ function removeAbsoluteComponents() {
 
     if (hasAbsoluteElements) {
       // Remove selected absolute elements directly
-      for (var i = selection.length - 1; i >= 0; i--) {
-        if ('layoutPositioning' in selection[i] && selection[i].layoutPositioning === 'ABSOLUTE') {
+      for (var j = selection.length - 1; j >= 0; j--) {
+        if ('layoutPositioning' in selection[j] && selection[j].layoutPositioning === 'ABSOLUTE') {
           try {
-            selection[i].remove();
+            selection[j].remove();
             removed++;
           } catch (e) {
             // ignore individual removal errors
@@ -530,8 +542,8 @@ function removeAbsoluteComponents() {
 
     // Check if any sections are in selection
     var hasSections = false;
-    for (var i = 0; i < selection.length; i++) {
-      if (selection[i].type === 'SECTION') {
+    for (var k = 0; k < selection.length; k++) {
+      if (selection[k].type === 'SECTION') {
         hasSections = true;
         break;
       }
@@ -552,8 +564,8 @@ function removeAbsoluteComponents() {
     else if ('children' in container) {
       var children = container.children;
 
-      for (var i = children.length - 1; i >= 0; i--) {
-        var child = children[i];
+      for (var m = children.length - 1; m >= 0; m--) {
+        var child = children[m];
         var isAbsolute = 'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE';
 
         if (isAbsolute) {
