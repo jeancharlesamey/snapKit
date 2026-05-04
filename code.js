@@ -1,15 +1,40 @@
 // SnapKit - Figma Plugin
 // Comprehensive plugin with alignment, absolute positioning, and component selection
 
-var uiHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>* { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; background: #fff; } .container { display: flex; flex-direction: column; gap: 12px; } input { width: 100%; padding: 10px; border: 2px solid #ccc; border-radius: 6px; font-size: 14px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: border-color 0.12s ease; } input:focus, input:active, input:not(:placeholder-shown) { outline: none; border-color: #00AC28; } button { padding: 8px; background: white; color: #00AC28; border: 2px solid #00AC28; border-radius: 6px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; font-weight: 500; line-height: 24px; cursor: pointer; transition: all 0.12s ease; display: flex; align-items: center; justify-content: center; gap: 6px; } button:hover { background: rgba(0, 172, 40, 0.05); } button:active { background: rgba(0, 172, 40, 0.1); } button.disabled { background: #f5f5f5; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; } button.danger { background: #FEF2F2; color: #DC2626; border-color: #DC2626; } button.danger:hover { background: rgba(220, 38, 38, 0.1); } button.danger:active { background: rgba(220, 38, 38, 0.15); } button.danger.disabled { background: #f5f5f5; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; } button svg { width: 16px; height: 16px; } .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .button-group.align-buttons { grid-template-columns: repeat(3, 1fr); } .button-group.align-buttons button { padding: 8px 12px; font-size: 13px; } .message { position: fixed; top: 16px; left: 16px; right: 16px; padding: 10px; border-radius: 4px; font-size: 12px; display: none; z-index: 9999; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); } .message.show { display: block; } .message.success { background: #D4EDDA; color: #155724; border: 1px solid #C3E6CB; } .message.error { background: #F8D7DA; color: #721C24; border: 1px solid #F5C6CB; } .overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.5); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 10000; padding: 24px; text-align: center; } .overlay.show { display: flex; } .spinner { width: 32px; height: 32px; border: 3px solid rgba(0,172,40,0.2); border-top-color: #00AC28; border-radius: 50%; animation: spin 0.8s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } } .overlay-msgs { position: relative; height: 40px; width: 200px; } .overlay-msg { position: absolute; top: 0; left: 0; right: 0; font-size: 13px; color: #333; line-height: 1.5; text-align: center; opacity: 0; } .overlay.show .m1 { animation: msgCycle 3s ease forwards; } .overlay.show .m2 { animation: msgCycle 5s ease forwards 3s; } .overlay.show .m3 { animation: msgCycle 4s ease forwards 8s; } .overlay.show .m4 { animation: msgCycle 5s ease forwards 12s; } .overlay.show .m5 { animation: msgFadeIn 0.5s ease forwards 17s; } .overlay.show .overlay-stop { animation: msgFadeIn 0.5s ease forwards 17s; } @keyframes msgCycle { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } } @keyframes msgFadeIn { from { opacity: 0; } to { opacity: 1; } } .overlay-stop { opacity: 0; padding: 8px 16px; background: white; color: #DC2626; border: 2px solid #DC2626; border-radius: 6px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 4px; }</style></head><body><div class="container"><div id="message" class="message"></div><input id="frameName" type="text" placeholder="Enter component name(s), comma separated..."><div class="button-group"><button id="selectBtn">Select component</button><button id="selectAbsoluteBtn">Select absolute</button></div><button id="duplicateBtn">Duplicate selected</button><button id="absoluteBtn">Set to absolute</button><button id="fixedScrollBtn" class="disabled" title="Not yet possible due to Figma API limitations">Set fixed scroll</button><button id="removeAbsBtn">Remove absolute</button><button id="deleteBtn" class="danger">Delete selected</button><div class="button-group align-buttons"><button id="alignLeftBtn" title="Align Left"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 1v13M5 3h8M5 7h6M5 11h10"/></svg></button><button id="alignCenterBtn" title="Align Center"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.5 1v13M4 3h7M3 7h9M2 11h11"/></svg></button><button id="alignRightBtn" title="Align Right"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 1v13M10 3H2M10 7H4M10 11H0"/></svg></button><button id="alignTopBtn" title="Align Top"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 2h13M3 5v8M7 5v6M11 5v10"/></svg></button><button id="alignMiddleBtn" title="Align Middle"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 7.5h13M3 3v9M7 4v7M11 2v11"/></svg></button><button id="alignBottomBtn" title="Align Bottom"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 13h13M3 10v-8M7 10v-6M11 10v-10"/></svg></button></div></div><div class="overlay" id="overlay"><div class="spinner"></div><div class="overlay-msgs"><span class="overlay-msg m1">Search to select components in progress</span><span class="overlay-msg m2">A lot of things to look at</span><span class="overlay-msg m3">Still in progress, and you?</span><span class="overlay-msg m4">Digging in the last frame</span><span class="overlay-msg m5">We are letting you cancel the selection if you think a problem happened</span></div><button class="overlay-stop" id="overlayStop">Stop the selection</button></div><script>var frameNameInput = document.getElementById("frameName"); var selectBtn = document.getElementById("selectBtn"); var selectAbsoluteBtn = document.getElementById("selectAbsoluteBtn"); var duplicateBtn = document.getElementById("duplicateBtn"); var absoluteBtn = document.getElementById("absoluteBtn"); var fixedScrollBtn = document.getElementById("fixedScrollBtn"); var alignLeftBtn = document.getElementById("alignLeftBtn"); var alignCenterBtn = document.getElementById("alignCenterBtn"); var alignRightBtn = document.getElementById("alignRightBtn"); var alignTopBtn = document.getElementById("alignTopBtn"); var alignMiddleBtn = document.getElementById("alignMiddleBtn"); var alignBottomBtn = document.getElementById("alignBottomBtn"); var removeAbsBtn = document.getElementById("removeAbsBtn"); var deleteBtn = document.getElementById("deleteBtn"); var messageDiv = document.getElementById("message"); var overlayDiv = document.getElementById("overlay"); var overlayStop = document.getElementById("overlayStop"); function showOverlay() { overlayDiv.classList.remove("show"); void overlayDiv.offsetWidth; overlayDiv.classList.add("show"); } function hideOverlay() { overlayDiv.classList.remove("show"); } overlayStop.onclick = function() { hideOverlay(); }; selectBtn.onclick = function() { var name = frameNameInput.value.trim(); if (!name) { showMessage("Please enter a component name", "error"); return; } showOverlay(); parent.postMessage({ pluginMessage: { type: "select-frame", name: name } }, "*"); }; selectAbsoluteBtn.onclick = function() { var name = frameNameInput.value.trim(); if (!name) { showMessage("Please enter a component name", "error"); return; } showOverlay(); parent.postMessage({ pluginMessage: { type: "select-absolute", name: name } }, "*"); }; duplicateBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "duplicate" } }, "*"); }; absoluteBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "set-absolute" } }, "*"); }; fixedScrollBtn.onclick = function() { showMessage("Set fixed scroll is not yet possible due to Figma API limitations", "error"); }; removeAbsBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "remove-absolute" } }, "*"); }; deleteBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "delete-selected" } }, "*"); }; alignLeftBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "left" } }, "*"); }; alignCenterBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "center" } }, "*"); }; alignRightBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "right" } }, "*"); }; alignTopBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "top" } }, "*"); }; alignMiddleBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "middle" } }, "*"); }; alignBottomBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "bottom" } }, "*"); }; window.onmessage = function(event) { var msg = event.data.pluginMessage; if (msg.type === "success") { hideOverlay(); showMessage(msg.text, "success"); } else if (msg.type === "error") { hideOverlay(); showMessage(msg.text, "error"); } else if (msg.type === "selection-change") { updateButtonStates(msg.hasSelection); } }; function showMessage(text, type) { messageDiv.textContent = text; messageDiv.className = "message " + type + " show"; setTimeout(function() { messageDiv.className = "message"; }, 3000); } function updateButtonStates(hasSelection) { var buttonsToDisable = [duplicateBtn, absoluteBtn, removeAbsBtn, deleteBtn, alignLeftBtn, alignCenterBtn, alignRightBtn, alignTopBtn, alignMiddleBtn, alignBottomBtn]; for (var i = 0; i < buttonsToDisable.length; i++) { if (hasSelection) { buttonsToDisable[i].classList.remove("disabled"); buttonsToDisable[i].disabled = false; } else { buttonsToDisable[i].classList.add("disabled"); buttonsToDisable[i].disabled = true; } } } parent.postMessage({ pluginMessage: { type: "check-selection" } }, "*");<\/script></body></html>';
+var uiHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>* { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; background: #fff; } .container { display: flex; flex-direction: column; gap: 12px; } input { width: 100%; padding: 10px; border: 2px solid #ccc; border-radius: 6px; font-size: 14px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: border-color 0.12s ease; } input:focus, input:active, input:not(:placeholder-shown) { outline: none; border-color: #00AC28; } button { padding: 8px; background: white; color: #00AC28; border: 2px solid #00AC28; border-radius: 6px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; font-weight: 500; line-height: 24px; cursor: pointer; transition: all 0.12s ease; display: flex; align-items: center; justify-content: center; gap: 6px; } button:hover { background: rgba(0, 172, 40, 0.05); } button:active { background: rgba(0, 172, 40, 0.1); } button.disabled { background: #f5f5f5; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; } button.danger { background: #FEF2F2; color: #DC2626; border-color: #DC2626; } button.danger:hover { background: rgba(220, 38, 38, 0.1); } button.danger:active { background: rgba(220, 38, 38, 0.15); } button.danger.disabled { background: #f5f5f5; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; } button svg { width: 16px; height: 16px; } .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .button-group.align-buttons { grid-template-columns: repeat(3, 1fr); } .button-group.align-buttons button { padding: 8px 12px; font-size: 13px; } .message { position: fixed; top: 16px; left: 16px; right: 16px; padding: 10px; border-radius: 4px; font-size: 12px; display: none; z-index: 9999; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); } .message.show { display: block; } .message.success { background: #D4EDDA; color: #155724; border: 1px solid #C3E6CB; } .message.error { background: #F8D7DA; color: #721C24; border: 1px solid #F5C6CB; } .overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.5); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 10000; padding: 24px; text-align: center; } .overlay.show { display: flex; } .spinner { width: 32px; height: 32px; border: 3px solid rgba(0,172,40,0.2); border-top-color: #00AC28; border-radius: 50%; animation: spin 0.8s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } } .overlay-msgs { position: relative; height: 40px; width: 200px; } .overlay-msg { position: absolute; top: 0; left: 0; right: 0; font-size: 13px; color: #333; line-height: 1.5; text-align: center; opacity: 0; } .overlay.show .m1 { animation: msgCycle 3s ease forwards; } .overlay.show .m2 { animation: msgCycle 5s ease forwards 3s; } .overlay.show .m3 { animation: msgCycle 4s ease forwards 8s; } .overlay.show .m4 { animation: msgCycle 5s ease forwards 12s; } .overlay.show .m5 { animation: msgFadeIn 0.5s ease forwards 17s; } .overlay.show .overlay-stop { animation: msgFadeIn 0.5s ease forwards 17s; } @keyframes msgCycle { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } } @keyframes msgFadeIn { from { opacity: 0; } to { opacity: 1; } } .overlay-stop { opacity: 0; padding: 8px 16px; background: white; color: #DC2626; border: 2px solid #DC2626; border-radius: 6px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 4px; }</style></head><body><div class="container"><div id="message" class="message"></div><input id="frameName" type="text" placeholder="Name(s) comma separated, * as wildcard..."><div class="button-group"><button id="selectBtn">Select</button><button id="selectAbsoluteBtn">Select absolute</button></div><button id="duplicateBtn">Duplicate selected</button><button id="absoluteBtn">Set to absolute</button><button id="fixedScrollBtn" class="disabled" title="Not yet possible due to Figma API limitations">Set fixed scroll</button><button id="removeAbsBtn">Remove absolute</button><button id="deleteBtn" class="danger">Delete selected</button><div class="button-group align-buttons"><button id="alignLeftBtn" title="Align Left"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 1v13M5 3h8M5 7h6M5 11h10"/></svg></button><button id="alignCenterBtn" title="Align Center"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.5 1v13M4 3h7M3 7h9M2 11h11"/></svg></button><button id="alignRightBtn" title="Align Right"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 1v13M10 3H2M10 7H4M10 11H0"/></svg></button><button id="alignTopBtn" title="Align Top"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 2h13M3 5v8M7 5v6M11 5v10"/></svg></button><button id="alignMiddleBtn" title="Align Middle"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 7.5h13M3 3v9M7 4v7M11 2v11"/></svg></button><button id="alignBottomBtn" title="Align Bottom"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 13h13M3 10v-8M7 10v-6M11 10v-10"/></svg></button></div></div><div class="overlay" id="overlay"><div class="spinner"></div><div class="overlay-msgs"><span class="overlay-msg m1">Search to select components in progress</span><span class="overlay-msg m2">A lot of things to look at</span><span class="overlay-msg m3">Still in progress, and you?</span><span class="overlay-msg m4">Digging in the last frame</span><span class="overlay-msg m5">We are letting you cancel the selection if you think a problem happened</span></div><button class="overlay-stop" id="overlayStop">Stop the selection</button></div><script>var frameNameInput = document.getElementById("frameName"); var selectBtn = document.getElementById("selectBtn"); var selectAbsoluteBtn = document.getElementById("selectAbsoluteBtn"); var duplicateBtn = document.getElementById("duplicateBtn"); var absoluteBtn = document.getElementById("absoluteBtn"); var fixedScrollBtn = document.getElementById("fixedScrollBtn"); var alignLeftBtn = document.getElementById("alignLeftBtn"); var alignCenterBtn = document.getElementById("alignCenterBtn"); var alignRightBtn = document.getElementById("alignRightBtn"); var alignTopBtn = document.getElementById("alignTopBtn"); var alignMiddleBtn = document.getElementById("alignMiddleBtn"); var alignBottomBtn = document.getElementById("alignBottomBtn"); var removeAbsBtn = document.getElementById("removeAbsBtn"); var deleteBtn = document.getElementById("deleteBtn"); var messageDiv = document.getElementById("message"); var overlayDiv = document.getElementById("overlay"); var overlayStop = document.getElementById("overlayStop"); function showOverlay() { overlayDiv.classList.remove("show"); void overlayDiv.offsetWidth; overlayDiv.classList.add("show"); } function hideOverlay() { overlayDiv.classList.remove("show"); } overlayStop.onclick = function() { hideOverlay(); }; selectBtn.onclick = function() { var name = frameNameInput.value.trim(); if (!name) { showMessage("Please enter a component name", "error"); return; } showOverlay(); parent.postMessage({ pluginMessage: { type: "select-frame", name: name } }, "*"); }; selectAbsoluteBtn.onclick = function() { var name = frameNameInput.value.trim(); showOverlay(); parent.postMessage({ pluginMessage: { type: "select-absolute", name: name } }, "*"); }; duplicateBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "duplicate" } }, "*"); }; absoluteBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "set-absolute" } }, "*"); }; fixedScrollBtn.onclick = function() { showMessage("Set fixed scroll is not yet possible due to Figma API limitations", "error"); }; removeAbsBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "remove-absolute" } }, "*"); }; deleteBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "delete-selected" } }, "*"); }; alignLeftBtn.onclick = function(e) { parent.postMessage({ pluginMessage: { type: "align", position: "left", shift: e.shiftKey } }, "*"); }; alignCenterBtn.onclick = function(e) { parent.postMessage({ pluginMessage: { type: "align", position: "center", shift: e.shiftKey } }, "*"); }; alignRightBtn.onclick = function(e) { parent.postMessage({ pluginMessage: { type: "align", position: "right", shift: e.shiftKey } }, "*"); }; alignTopBtn.onclick = function(e) { parent.postMessage({ pluginMessage: { type: "align", position: "top", shift: e.shiftKey } }, "*"); }; alignMiddleBtn.onclick = function(e) { parent.postMessage({ pluginMessage: { type: "align", position: "middle", shift: e.shiftKey } }, "*"); }; alignBottomBtn.onclick = function(e) { parent.postMessage({ pluginMessage: { type: "align", position: "bottom", shift: e.shiftKey } }, "*"); }; window.onmessage = function(event) { var msg = event.data.pluginMessage; if (msg.type === "success") { hideOverlay(); showMessage(msg.text, "success"); } else if (msg.type === "error") { hideOverlay(); showMessage(msg.text, "error"); } else if (msg.type === "selection-change") { updateButtonStates(msg.hasSelection, msg.hasAbsolute, msg.hasNonAbsolute, msg.hasContainer); } }; function showMessage(text, type) { messageDiv.textContent = text; messageDiv.className = "message " + type + " show"; setTimeout(function() { messageDiv.className = "message"; }, 3000); } function updateButtonStates(hasSelection, hasAbsolute, hasNonAbsolute, hasContainer) { var baseButtons = [duplicateBtn, deleteBtn, alignLeftBtn, alignCenterBtn, alignRightBtn, alignTopBtn, alignMiddleBtn, alignBottomBtn]; for (var i = 0; i < baseButtons.length; i++) { if (hasSelection) { baseButtons[i].classList.remove("disabled"); baseButtons[i].disabled = false; } else { baseButtons[i].classList.add("disabled"); baseButtons[i].disabled = true; } } var canSetAbs = hasNonAbsolute; absoluteBtn.classList.toggle("disabled", !canSetAbs); absoluteBtn.disabled = !canSetAbs; var canRemAbs = !hasSelection || hasAbsolute || hasContainer; removeAbsBtn.classList.toggle("disabled", !canRemAbs); removeAbsBtn.disabled = !canRemAbs; } parent.postMessage({ pluginMessage: { type: "check-selection" } }, "*");<\/script></body></html>';
 
 figma.showUI(uiHtml, { width: 320, height: 560 });
 
 // Listen for selection changes and update UI button states
 figma.on('selectionchange', function() {
-  var hasSelection = figma.currentPage.selection.length > 0;
-  figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection });
+  var selection = figma.currentPage.selection;
+  var hasSelection = selection.length > 0;
+  var hasAbsolute = false;
+  var hasNonAbsolute = false;
+  var hasContainer = false;
+  for (var i = 0; i < selection.length; i++) {
+    var n = selection[i];
+    if ('layoutPositioning' in n && n.layoutPositioning === 'ABSOLUTE') {
+      hasAbsolute = true;
+    } else if (n.type !== 'FRAME' && n.type !== 'SECTION') {
+      hasNonAbsolute = true;
+    }
+    if (n.type === 'FRAME' || n.type === 'SECTION' || n.type === 'COMPONENT' || n.type === 'INSTANCE' || n.type === 'GROUP') {
+      hasContainer = true;
+    }
+  }
+  figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection, hasAbsolute: hasAbsolute, hasNonAbsolute: hasNonAbsolute, hasContainer: hasContainer });
 });
+
+// Match a node name against a pattern. * is a wildcard that matches any sequence of characters.
+// No wildcard → exact match. Examples: "Section*", "*Nav*", "Tab*Bar".
+function matchesPattern(name, pattern) {
+  if (pattern.indexOf('*') === -1) return name === pattern;
+  var regexStr = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*');
+  return new RegExp('^' + regexStr + '$').test(name);
+}
 
 // Recursively find children matching any of the given names
 function findByName(container, names, results) {
@@ -18,7 +43,7 @@ function findByName(container, names, results) {
   for (var i = 0; i < children.length; i++) {
     var child = children[i];
     for (var n = 0; n < names.length; n++) {
-      if (child.name === names[n]) {
+      if (matchesPattern(child.name, names[n])) {
         results.push(child);
         break; // prevent double-push if the same name appears twice in input
       }
@@ -29,7 +54,8 @@ function findByName(container, names, results) {
   }
 }
 
-// Recursively find absolute-positioned children matching any of the given names
+// Recursively find absolute-positioned children matching any of the given names.
+// If names is empty, collects all absolute elements (no name filter).
 function findAbsoluteByName(container, names, results) {
   if (!('children' in container)) return;
   var children = container.children;
@@ -37,10 +63,14 @@ function findAbsoluteByName(container, names, results) {
     var child = children[i];
     var isAbsolute = 'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE';
     if (isAbsolute) {
-      for (var n = 0; n < names.length; n++) {
-        if (child.name === names[n]) {
-          results.push(child);
-          break; // prevent double-push if the same name appears twice in input
+      if (names.length === 0) {
+        results.push(child);
+      } else {
+        for (var n = 0; n < names.length; n++) {
+          if (matchesPattern(child.name, names[n])) {
+            results.push(child);
+            break; // prevent double-push if the same name appears twice in input
+          }
         }
       }
     }
@@ -80,7 +110,13 @@ function selectFrameByName(nameInput) {
   var foundFrames = [];
 
   for (var s = 0; s < framesToSearch.length; s++) {
-    findByName(framesToSearch[s], names, foundFrames);
+    var item = framesToSearch[s];
+    // Check the item itself — top-level frames are containers to search inside,
+    // but they are also valid candidates (e.g. "Section*" matching top-level "Section 2")
+    for (var p = 0; p < names.length; p++) {
+      if (matchesPattern(item.name, names[p])) { foundFrames.push(item); break; }
+    }
+    findByName(item, names, foundFrames);
   }
 
   // Create display text for names
@@ -101,13 +137,8 @@ function selectFrameByName(nameInput) {
 function selectAbsoluteByName(nameInput) {
   var selection = figma.currentPage.selection;
 
-  // Parse comma-separated names and trim whitespace
-  var names = nameInput.split(',').map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; });
-
-  if (names.length === 0) {
-    figma.ui.postMessage({ type: 'error', text: 'Please enter at least one component name' });
-    return;
-  }
+  // Parse comma-separated names — empty input means "select all absolute elements"
+  var names = nameInput ? nameInput.split(',').map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; }) : [];
 
   // Determine which frames to search
   var framesToSearch = [];
@@ -118,7 +149,7 @@ function selectAbsoluteByName(nameInput) {
     framesToSearch = figma.currentPage.children;
     searchScope = 'on page';
   } else {
-    // Selection exists: search within selected frames
+    // Selection exists: search within selected frames/sections
     framesToSearch = selection;
     searchScope = 'in selected frames';
   }
@@ -126,18 +157,36 @@ function selectAbsoluteByName(nameInput) {
   var foundFrames = [];
 
   for (var s = 0; s < framesToSearch.length; s++) {
-    findAbsoluteByName(framesToSearch[s], names, foundFrames);
+    var item = framesToSearch[s];
+    var itemIsAbsolute = 'layoutPositioning' in item && item.layoutPositioning === 'ABSOLUTE';
+    if (itemIsAbsolute) {
+      if (names.length === 0) {
+        foundFrames.push(item);
+      } else {
+        for (var p = 0; p < names.length; p++) {
+          if (matchesPattern(item.name, names[p])) { foundFrames.push(item); break; }
+        }
+      }
+    }
+    findAbsoluteByName(item, names, foundFrames);
   }
 
-  // Create display text for names
-  var namesDisplay = names.length === 1 ? '"' + names[0] + '"' : names.map(function(n) { return '"' + n + '"'; }).join(', ');
+  var successText, errorText;
+  if (names.length === 0) {
+    successText = 'Found and selected ' + foundFrames.length + ' absolute element(s) ' + searchScope;
+    errorText = 'No absolute elements found ' + searchScope;
+  } else {
+    var namesDisplay = names.length === 1 ? '"' + names[0] + '"' : names.map(function(n) { return '"' + n + '"'; }).join(', ');
+    successText = 'Found and selected ' + foundFrames.length + ' absolute component(s) named ' + namesDisplay + ' ' + searchScope;
+    errorText = 'No absolute components named ' + namesDisplay + ' found ' + searchScope;
+  }
 
   if (foundFrames.length > 0) {
     figma.currentPage.selection = foundFrames;
     figma.viewport.scrollAndZoomIntoView(foundFrames);
-    figma.ui.postMessage({ type: 'success', text: 'Found and selected ' + foundFrames.length + ' absolute component(s) named ' + namesDisplay + ' ' + searchScope });
+    figma.ui.postMessage({ type: 'success', text: successText });
   } else {
-    figma.ui.postMessage({ type: 'error', text: 'No absolute components named ' + namesDisplay + ' found ' + searchScope });
+    figma.ui.postMessage({ type: 'error', text: errorText });
   }
 }
 
@@ -355,7 +404,7 @@ function setFixedScroll() {
 }
 
 // Align selected elements to a specific position
-function alignElements(position) {
+function alignElements(position, shift) {
   var selection = figma.currentPage.selection;
 
   if (selection.length === 0) {
@@ -375,8 +424,9 @@ function alignElements(position) {
     var nodeIsAbsolute = 'layoutPositioning' in node && node.layoutPositioning === 'ABSOLUTE';
     var parentIsAutolayout = 'layoutMode' in parent && parent.layoutMode !== 'NONE';
 
-    if (nodeIsAutolayout) {
-      // Node is itself an autolayout container: change its internal alignment properties
+    if (nodeIsAutolayout && (!nodeIsAbsolute || shift)) {
+      // Autolayout container: change its internal alignment properties.
+      // Applies to non-absolute frames, and to absolute frames when Shift is held.
       var isHorizontal = node.layoutMode === 'HORIZONTAL';
       if (isHorizontal) {
         // Primary axis = horizontal, counter axis = vertical
@@ -395,7 +445,7 @@ function alignElements(position) {
         else if (position === 'center') { node.counterAxisAlignItems = 'CENTER'; count++; }
         else if (position === 'right')  { node.counterAxisAlignItems = 'MAX';    count++; }
       }
-    } else if (parentIsAutolayout && !nodeIsAbsolute) {
+    } else if (!nodeIsAbsolute && parentIsAutolayout) {
       // Non-absolute child inside an autolayout: use layoutAlign for cross-axis only.
       // Primary-axis position is not controllable per-child — skip silently.
       if (!('layoutAlign' in node)) continue;
@@ -602,11 +652,26 @@ figma.ui.onmessage = function(msg) {
   } else if (msg.type === 'set-fixed-scroll') {
     setFixedScroll();
   } else if (msg.type === 'align') {
-    alignElements(msg.position);
+    alignElements(msg.position, msg.shift);
   } else if (msg.type === 'remove-absolute') {
     removeAbsoluteComponents();
   } else if (msg.type === 'check-selection') {
-    var hasSelection = figma.currentPage.selection.length > 0;
-    figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection });
+    var sel = figma.currentPage.selection;
+    var hasSelection = sel.length > 0;
+    var hasAbsolute = false;
+    var hasNonAbsolute = false;
+    var hasContainer = false;
+    for (var i = 0; i < sel.length; i++) {
+      var n = sel[i];
+      if ('layoutPositioning' in n && n.layoutPositioning === 'ABSOLUTE') {
+        hasAbsolute = true;
+      } else {
+        hasNonAbsolute = true;
+      }
+      if (n.type === 'FRAME' || n.type === 'SECTION' || n.type === 'COMPONENT' || n.type === 'INSTANCE' || n.type === 'GROUP') {
+        hasContainer = true;
+      }
+    }
+    figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection, hasAbsolute: hasAbsolute, hasNonAbsolute: hasNonAbsolute, hasContainer: hasContainer });
   }
 };
