@@ -1,4 +1,4 @@
-# SnapKit v0.0.4-alpha
+# SnapKit v1.0.1-alpha
 
 A Figma plugin for managing prototype elements with absolute positioning, alignment, and component selection.
 
@@ -85,6 +85,14 @@ Alignment adapts to the selected element's context:
 
 
 ## RELEASE NOTES
+
+### v1.0.1-alpha (May 6, 2026)
+**Improvements:**
+- Added a loader for massive search
+- Improved: Button states are now context-aware based on the selected element's positioning
+  - "Set to absolute" is disabled when the selection is already absolute, or when a frame/section is selected
+  - "Remove absolute" is disabled when the selection contains no absolute elements and no frames/sections
+  - "Remove absolute" stays accessible with no selection (whole-page mode) or when frames/sections are selected
 
 ### v0.0.4-alpha (April 30, 2026)
 **Improvements:**
