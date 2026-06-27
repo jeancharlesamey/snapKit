@@ -42,6 +42,20 @@ Alignment adapts to the selected element's context:
 3. The plugin will appear in your Plugins menu
 
 
+## DEVELOPMENT
+
+The plugin runs entirely inside Figma, but its core logic (`code.js`) is covered
+by a dependency-free test suite that mocks the Figma plugin API and exercises
+every UI message handler (select, duplicate, set-to-absolute, align, remove,
+delete). Run it with Node:
+
+```
+npm test
+```
+
+No `npm install` is required — the tests use only Node's built-in modules.
+
+
 ## USAGE
 
 ### Quick Start
