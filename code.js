@@ -1,7 +1,7 @@
 // SnapKit - Figma Plugin
 // Comprehensive plugin with alignment, absolute positioning, and component selection
 
-var uiHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>* { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; background: #fff; } .container { display: flex; flex-direction: column; gap: 12px; } input { width: 100%; padding: 10px; border: 2px solid #ccc; border-radius: 6px; font-size: 14px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: border-color 0.12s ease; } input:focus, input:active, input:not(:placeholder-shown) { outline: none; border-color: #00AC28; } button { padding: 8px; background: white; color: #00AC28; border: 2px solid #00AC28; border-radius: 6px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; font-weight: 500; line-height: 24px; cursor: pointer; transition: all 0.12s ease; display: flex; align-items: center; justify-content: center; gap: 6px; } button:hover { background: rgba(0, 172, 40, 0.05); } button:active { background: rgba(0, 172, 40, 0.1); } button.disabled { background: #f5f5f5; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; } button.danger { background: #FEF2F2; color: #DC2626; border-color: #DC2626; } button.danger:hover { background: rgba(220, 38, 38, 0.1); } button.danger:active { background: rgba(220, 38, 38, 0.15); } button.danger.disabled { background: #f5f5f5; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; } button svg { width: 16px; height: 16px; } .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .button-group.align-buttons { grid-template-columns: repeat(3, 1fr); } .button-group.align-buttons button { padding: 8px 12px; font-size: 13px; } .message { position: fixed; top: 16px; left: 16px; right: 16px; padding: 10px; border-radius: 4px; font-size: 12px; display: none; z-index: 9999; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); } .message.show { display: block; } .message.success { background: #D4EDDA; color: #155724; border: 1px solid #C3E6CB; } .message.error { background: #F8D7DA; color: #721C24; border: 1px solid #F5C6CB; }</style></head><body><div class="container"><div id="message" class="message"></div><input id="frameName" type="text" placeholder="Enter component name(s), comma separated..."><div class="button-group"><button id="selectBtn">Select component</button><button id="selectAbsoluteBtn">Select absolute</button></div><button id="duplicateBtn">Duplicate selected</button><button id="absoluteBtn">Set to absolute</button><button id="fixedScrollBtn" class="disabled" title="Not yet possible due to Figma API limitations">Set fixed scroll</button><button id="removeAbsBtn">Remove absolute</button><button id="deleteBtn" class="danger">Delete selected</button><div class="button-group align-buttons"><button id="alignLeftBtn" title="Align Left"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 1v13M5 3h8M5 7h6M5 11h10"/></svg></button><button id="alignCenterBtn" title="Align Center"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.5 1v13M4 3h7M3 7h9M2 11h11"/></svg></button><button id="alignRightBtn" title="Align Right"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 1v13M10 3H2M10 7H4M10 11H0"/></svg></button><button id="alignTopBtn" title="Align Top"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 2h13M3 5v8M7 5v6M11 5v10"/></svg></button><button id="alignMiddleBtn" title="Align Middle"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 7.5h13M3 3v9M7 4v7M11 2v11"/></svg></button><button id="alignBottomBtn" title="Align Bottom"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 13h13M3 10v-8M7 10v-6M11 10v-10"/></svg></button></div></div><script>var frameNameInput = document.getElementById("frameName"); var selectBtn = document.getElementById("selectBtn"); var selectAbsoluteBtn = document.getElementById("selectAbsoluteBtn"); var duplicateBtn = document.getElementById("duplicateBtn"); var absoluteBtn = document.getElementById("absoluteBtn"); var fixedScrollBtn = document.getElementById("fixedScrollBtn"); var alignLeftBtn = document.getElementById("alignLeftBtn"); var alignCenterBtn = document.getElementById("alignCenterBtn"); var alignRightBtn = document.getElementById("alignRightBtn"); var alignTopBtn = document.getElementById("alignTopBtn"); var alignMiddleBtn = document.getElementById("alignMiddleBtn"); var alignBottomBtn = document.getElementById("alignBottomBtn"); var removeAbsBtn = document.getElementById("removeAbsBtn"); var deleteBtn = document.getElementById("deleteBtn"); var messageDiv = document.getElementById("message"); selectBtn.onclick = function() { var name = frameNameInput.value.trim(); if (!name) { showMessage("Please enter a component name", "error"); return; } parent.postMessage({ pluginMessage: { type: "select-frame", name: name } }, "*"); }; selectAbsoluteBtn.onclick = function() { var name = frameNameInput.value.trim(); if (!name) { showMessage("Please enter a component name", "error"); return; } parent.postMessage({ pluginMessage: { type: "select-absolute", name: name } }, "*"); }; duplicateBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "duplicate" } }, "*"); }; absoluteBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "set-absolute" } }, "*"); }; fixedScrollBtn.onclick = function() { showMessage("Set fixed scroll is not yet possible due to Figma API limitations", "error"); }; removeAbsBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "remove-absolute" } }, "*"); }; deleteBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "delete-selected" } }, "*"); }; alignLeftBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "left" } }, "*"); }; alignCenterBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "center" } }, "*"); }; alignRightBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "right" } }, "*"); }; alignTopBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "top" } }, "*"); }; alignMiddleBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "middle" } }, "*"); }; alignBottomBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "bottom" } }, "*"); }; window.onmessage = function(event) { var msg = event.data && event.data.pluginMessage; if (!msg) { return; } if (msg.type === "success") { showMessage(msg.text, "success"); } else if (msg.type === "error") { showMessage(msg.text, "error"); } else if (msg.type === "selection-change") { updateButtonStates(msg.hasSelection); } }; function showMessage(text, type) { messageDiv.textContent = text; messageDiv.className = "message " + type + " show"; setTimeout(function() { messageDiv.className = "message"; }, 3000); } function updateButtonStates(hasSelection) { var buttonsToDisable = [duplicateBtn, absoluteBtn, removeAbsBtn, deleteBtn, alignLeftBtn, alignCenterBtn, alignRightBtn, alignTopBtn, alignMiddleBtn, alignBottomBtn]; for (var i = 0; i < buttonsToDisable.length; i++) { if (hasSelection) { buttonsToDisable[i].classList.remove("disabled"); buttonsToDisable[i].disabled = false; } else { buttonsToDisable[i].classList.add("disabled"); buttonsToDisable[i].disabled = true; } } } parent.postMessage({ pluginMessage: { type: "check-selection" } }, "*");<\/script></body></html>';
+var uiHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>* { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; background: #fff; } .container { display: flex; flex-direction: column; gap: 12px; } input { width: 100%; padding: 10px; border: 2px solid #ccc; border-radius: 6px; font-size: 14px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: border-color 0.12s ease; } input:focus, input:active, input:not(:placeholder-shown) { outline: none; border-color: #00AC28; } button { padding: 8px; background: white; color: #00AC28; border: 2px solid #00AC28; border-radius: 6px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; font-weight: 500; line-height: 24px; cursor: pointer; transition: all 0.12s ease; display: flex; align-items: center; justify-content: center; gap: 6px; } button:hover { background: rgba(0, 172, 40, 0.05); } button:active { background: rgba(0, 172, 40, 0.1); } button.disabled { background: #f5f5f5; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; } button.danger { background: #FEF2F2; color: #DC2626; border-color: #DC2626; } button.danger:hover { background: rgba(220, 38, 38, 0.1); } button.danger:active { background: rgba(220, 38, 38, 0.15); } button.danger.disabled { background: #f5f5f5; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; } button svg { width: 16px; height: 16px; } .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .button-group.align-buttons { grid-template-columns: repeat(3, 1fr); } .button-group.align-buttons button { padding: 8px 12px; font-size: 13px; } .search-row { position: relative; display: flex; gap: 8px; align-items: stretch; } .search-row input { flex: 1; } .icon-btn { position: relative; flex: 0 0 auto; width: 40px; padding: 8px; } .icon-btn.open { background: rgba(0, 172, 40, 0.1); } .icon-btn .dot { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: #00AC28; display: none; } .icon-btn.filtered .dot { display: block; } .popover { position: absolute; top: calc(100% + 6px); right: 0; z-index: 50; min-width: 210px; padding: 4px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); display: none; } .popover.show { display: block; } .popover-title { padding: 6px 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #9ca3af; } .popover-option { width: 100%; padding: 8px; justify-content: flex-start; gap: 8px; background: none; border: none; border-radius: 6px; color: #374151; font-size: 13px; font-weight: 400; line-height: 16px; } .popover-option:hover { background: #f5f5f5; } .popover-option.selected { color: #00AC28; font-weight: 500; } .popover-option svg { flex: 0 0 auto; visibility: hidden; } .popover-option.selected svg { visibility: visible; } .message { position: fixed; top: 16px; left: 16px; right: 16px; padding: 10px; border-radius: 4px; font-size: 12px; display: none; z-index: 9999; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); } .message.show { display: block; } .message.success { background: #D4EDDA; color: #155724; border: 1px solid #C3E6CB; } .message.error { background: #F8D7DA; color: #721C24; border: 1px solid #F5C6CB; }</style></head><body><div class="container"><div id="message" class="message"></div><div class="search-row"><input id="frameName" type="text" placeholder="Enter component name(s), comma separated..."><button id="filterBtn" class="icon-btn" title="Filter by element type (all types)"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 3h12M3.5 7.5h8M6 12h3"/></svg><span class="dot"></span></button><div id="filterPopover" class="popover"><div class="popover-title">Element type</div><button class="popover-option selected" data-type="all"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8l4 4 7-9"/></svg>All types</button><button class="popover-option" data-type="component"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8l4 4 7-9"/></svg>Components only</button><button class="popover-option" data-type="non-component"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8l4 4 7-9"/></svg>Everything but components</button></div></div><div class="button-group"><button id="selectBtn">Select component</button><button id="selectAbsoluteBtn">Select absolute</button></div><button id="duplicateBtn">Duplicate selected</button><button id="absoluteBtn">Set to absolute</button><button id="fixedScrollBtn" class="disabled" title="Not yet possible due to Figma API limitations">Set fixed scroll</button><button id="removeAbsBtn">Remove absolute</button><button id="deleteBtn" class="danger">Delete selected</button><div class="button-group align-buttons"><button id="alignLeftBtn" title="Align Left"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 1v13M5 3h8M5 7h6M5 11h10"/></svg></button><button id="alignCenterBtn" title="Align Center"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.5 1v13M4 3h7M3 7h9M2 11h11"/></svg></button><button id="alignRightBtn" title="Align Right"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 1v13M10 3H2M10 7H4M10 11H0"/></svg></button><button id="alignTopBtn" title="Align Top"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 2h13M3 5v8M7 5v6M11 5v10"/></svg></button><button id="alignMiddleBtn" title="Align Middle"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 7.5h13M3 3v9M7 4v7M11 2v11"/></svg></button><button id="alignBottomBtn" title="Align Bottom"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 13h13M3 10v-8M7 10v-6M11 10v-10"/></svg></button></div></div><script>var frameNameInput = document.getElementById("frameName"); var selectBtn = document.getElementById("selectBtn"); var selectAbsoluteBtn = document.getElementById("selectAbsoluteBtn"); var duplicateBtn = document.getElementById("duplicateBtn"); var absoluteBtn = document.getElementById("absoluteBtn"); var fixedScrollBtn = document.getElementById("fixedScrollBtn"); var alignLeftBtn = document.getElementById("alignLeftBtn"); var alignCenterBtn = document.getElementById("alignCenterBtn"); var alignRightBtn = document.getElementById("alignRightBtn"); var alignTopBtn = document.getElementById("alignTopBtn"); var alignMiddleBtn = document.getElementById("alignMiddleBtn"); var alignBottomBtn = document.getElementById("alignBottomBtn"); var removeAbsBtn = document.getElementById("removeAbsBtn"); var deleteBtn = document.getElementById("deleteBtn"); var messageDiv = document.getElementById("message"); var filterBtn = document.getElementById("filterBtn"); var filterPopover = document.getElementById("filterPopover"); var typeOptions = filterPopover.querySelectorAll(".popover-option"); var typeFilterLabels = { "all": "all types", "component": "components only", "non-component": "everything but components" }; var typeFilter = "all"; filterBtn.onclick = function(event) { event.stopPropagation(); if (filterPopover.classList.contains("show")) { closeFilterPopover(); } else { filterPopover.classList.add("show"); filterBtn.classList.add("open"); } }; filterPopover.onclick = function(event) { event.stopPropagation(); }; document.body.onclick = function() { closeFilterPopover(); }; for (var t = 0; t < typeOptions.length; t++) { typeOptions[t].onclick = function() { setTypeFilter(this.getAttribute("data-type")); }; } function closeFilterPopover() { filterPopover.classList.remove("show"); filterBtn.classList.remove("open"); } function setTypeFilter(value) { typeFilter = value; for (var i = 0; i < typeOptions.length; i++) { if (typeOptions[i].getAttribute("data-type") === value) { typeOptions[i].classList.add("selected"); } else { typeOptions[i].classList.remove("selected"); } } if (value === "all") { filterBtn.classList.remove("filtered"); } else { filterBtn.classList.add("filtered"); } filterBtn.title = "Filter by element type (" + typeFilterLabels[value] + ")"; closeFilterPopover(); } selectBtn.onclick = function() { var name = frameNameInput.value.trim(); if (!name) { showMessage("Please enter a component name", "error"); return; } parent.postMessage({ pluginMessage: { type: "select-frame", name: name, typeFilter: typeFilter } }, "*"); }; selectAbsoluteBtn.onclick = function() { var name = frameNameInput.value.trim(); if (!name) { showMessage("Please enter a component name", "error"); return; } parent.postMessage({ pluginMessage: { type: "select-absolute", name: name, typeFilter: typeFilter } }, "*"); };duplicateBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "duplicate" } }, "*"); }; absoluteBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "set-absolute" } }, "*"); }; fixedScrollBtn.onclick = function() { showMessage("Set fixed scroll is not yet possible due to Figma API limitations", "error"); }; removeAbsBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "remove-absolute" } }, "*"); }; deleteBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "delete-selected" } }, "*"); }; alignLeftBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "left" } }, "*"); }; alignCenterBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "center" } }, "*"); }; alignRightBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "right" } }, "*"); }; alignTopBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "top" } }, "*"); }; alignMiddleBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "middle" } }, "*"); }; alignBottomBtn.onclick = function() { parent.postMessage({ pluginMessage: { type: "align", position: "bottom" } }, "*"); }; window.onmessage = function(event) { var msg = event.data && event.data.pluginMessage; if (!msg) { return; } if (msg.type === "success") { showMessage(msg.text, "success"); } else if (msg.type === "error") { showMessage(msg.text, "error"); } else if (msg.type === "selection-change") { updateButtonStates(msg.hasSelection); } }; function showMessage(text, type) { messageDiv.textContent = text; messageDiv.className = "message " + type + " show"; setTimeout(function() { messageDiv.className = "message"; }, 3000); } function updateButtonStates(hasSelection) { var buttonsToDisable = [duplicateBtn, absoluteBtn, removeAbsBtn, deleteBtn, alignLeftBtn, alignCenterBtn, alignRightBtn, alignTopBtn, alignMiddleBtn, alignBottomBtn]; for (var i = 0; i < buttonsToDisable.length; i++) { if (hasSelection) { buttonsToDisable[i].classList.remove("disabled"); buttonsToDisable[i].disabled = false; } else { buttonsToDisable[i].classList.add("disabled"); buttonsToDisable[i].disabled = true; } } } parent.postMessage({ pluginMessage: { type: "check-selection" } }, "*");<\/script></body></html>';
 
 figma.showUI(uiHtml, { width: 320, height: 560 });
 
@@ -11,32 +11,39 @@ figma.on('selectionchange', function() {
   figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection });
 });
 
-// Recursively find children matching any of the given names
-function findByName(container, names, results) {
-  if (!('children' in container)) return;
-  var children = container.children;
-  for (var i = 0; i < children.length; i++) {
-    var child = children[i];
-    for (var n = 0; n < names.length; n++) {
-      if (child.name === names[n]) {
-        results.push(child);
-        break; // prevent double-push if the same name appears twice in input
-      }
-    }
-    if ('children' in child) {
-      findByName(child, names, results);
-    }
-  }
+// --- Element type filter ----------------------------------------------------
+// Name searches can be narrowed to a node type. 'all' (the default) matches
+// everything, 'component' matches components/variant sets/instances, and
+// 'non-component' matches everything else (frames, groups, text, shapes...).
+var COMPONENT_TYPES = { COMPONENT: true, COMPONENT_SET: true, INSTANCE: true };
+
+function normalizeTypeFilter(typeFilter) {
+  return (typeFilter === 'component' || typeFilter === 'non-component') ? typeFilter : 'all';
 }
 
-// Recursively find absolute-positioned children matching any of the given names
-function findAbsoluteByName(container, names, results) {
+function matchesTypeFilter(node, typeFilter) {
+  var isComponent = COMPONENT_TYPES[node.type] === true;
+  if (typeFilter === 'component') return isComponent;
+  if (typeFilter === 'non-component') return !isComponent;
+  return true;
+}
+
+// How to name what we searched for, so the result message stays honest about
+// the active filter.
+function typeFilterNoun(typeFilter) {
+  if (typeFilter === 'component') return 'component';
+  if (typeFilter === 'non-component') return 'non-component element';
+  return 'element';
+}
+
+// Recursively find children matching any of the given names and the type filter.
+// Recursion is never filtered — a non-matching container can still hold matches.
+function findByName(container, names, results, typeFilter) {
   if (!('children' in container)) return;
   var children = container.children;
   for (var i = 0; i < children.length; i++) {
     var child = children[i];
-    var isAbsolute = 'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE';
-    if (isAbsolute) {
+    if (matchesTypeFilter(child, typeFilter)) {
       for (var n = 0; n < names.length; n++) {
         if (child.name === names[n]) {
           results.push(child);
@@ -45,15 +52,38 @@ function findAbsoluteByName(container, names, results) {
       }
     }
     if ('children' in child) {
-      findAbsoluteByName(child, names, results);
+      findByName(child, names, results, typeFilter);
+    }
+  }
+}
+
+// Recursively find absolute-positioned children matching any of the given names
+function findAbsoluteByName(container, names, results, typeFilter) {
+  if (!('children' in container)) return;
+  var children = container.children;
+  for (var i = 0; i < children.length; i++) {
+    var child = children[i];
+    var isAbsolute = 'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE';
+    if (isAbsolute && matchesTypeFilter(child, typeFilter)) {
+      for (var n = 0; n < names.length; n++) {
+        if (child.name === names[n]) {
+          results.push(child);
+          break; // prevent double-push if the same name appears twice in input
+        }
+      }
+    }
+    if ('children' in child) {
+      findAbsoluteByName(child, names, results, typeFilter);
     }
   }
 }
 
 // Select a frame by name within selected frames or all page frames
 // Supports multiple names separated by commas (e.g., "Header, TapBar")
-function selectFrameByName(nameInput) {
+function selectFrameByName(nameInput, typeFilterInput) {
   var selection = figma.currentPage.selection;
+  var typeFilter = normalizeTypeFilter(typeFilterInput);
+  var noun = typeFilterNoun(typeFilter);
 
   // Parse comma-separated names and trim whitespace
   var names = nameInput.split(',').map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; });
@@ -80,7 +110,7 @@ function selectFrameByName(nameInput) {
   var foundFrames = [];
 
   for (var s = 0; s < framesToSearch.length; s++) {
-    findByName(framesToSearch[s], names, foundFrames);
+    findByName(framesToSearch[s], names, foundFrames, typeFilter);
   }
 
   // Create display text for names
@@ -89,17 +119,19 @@ function selectFrameByName(nameInput) {
   if (foundFrames.length > 0) {
     figma.currentPage.selection = foundFrames;
     figma.viewport.scrollAndZoomIntoView(foundFrames);
-    figma.ui.postMessage({ type: 'success', text: 'Found and selected ' + foundFrames.length + ' component(s) named ' + namesDisplay + ' ' + searchScope });
+    figma.ui.postMessage({ type: 'success', text: 'Found and selected ' + foundFrames.length + ' ' + noun + '(s) named ' + namesDisplay + ' ' + searchScope });
   } else {
-    figma.ui.postMessage({ type: 'error', text: 'No components named ' + namesDisplay + ' found ' + searchScope });
+    figma.ui.postMessage({ type: 'error', text: 'No ' + noun + '(s) named ' + namesDisplay + ' found ' + searchScope });
   }
 }
 
 // Select absolute-positioned components by name within selected frames or all page frames
 // Supports multiple names separated by commas (e.g., "Header, TapBar")
 // Only selects components with layoutPositioning === 'ABSOLUTE'
-function selectAbsoluteByName(nameInput) {
+function selectAbsoluteByName(nameInput, typeFilterInput) {
   var selection = figma.currentPage.selection;
+  var typeFilter = normalizeTypeFilter(typeFilterInput);
+  var noun = typeFilterNoun(typeFilter);
 
   // Parse comma-separated names and trim whitespace
   var names = nameInput.split(',').map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; });
@@ -126,7 +158,7 @@ function selectAbsoluteByName(nameInput) {
   var foundFrames = [];
 
   for (var s = 0; s < framesToSearch.length; s++) {
-    findAbsoluteByName(framesToSearch[s], names, foundFrames);
+    findAbsoluteByName(framesToSearch[s], names, foundFrames, typeFilter);
   }
 
   // Create display text for names
@@ -135,9 +167,9 @@ function selectAbsoluteByName(nameInput) {
   if (foundFrames.length > 0) {
     figma.currentPage.selection = foundFrames;
     figma.viewport.scrollAndZoomIntoView(foundFrames);
-    figma.ui.postMessage({ type: 'success', text: 'Found and selected ' + foundFrames.length + ' absolute component(s) named ' + namesDisplay + ' ' + searchScope });
+    figma.ui.postMessage({ type: 'success', text: 'Found and selected ' + foundFrames.length + ' absolute ' + noun + '(s) named ' + namesDisplay + ' ' + searchScope });
   } else {
-    figma.ui.postMessage({ type: 'error', text: 'No absolute components named ' + namesDisplay + ' found ' + searchScope });
+    figma.ui.postMessage({ type: 'error', text: 'No absolute ' + noun + '(s) named ' + namesDisplay + ' found ' + searchScope });
   }
 }
 
@@ -590,9 +622,9 @@ function removeAbsoluteComponents() {
 // Listen for messages from UI
 figma.ui.onmessage = function(msg) {
   if (msg.type === 'select-frame') {
-    selectFrameByName(msg.name);
+    selectFrameByName(msg.name, msg.typeFilter);
   } else if (msg.type === 'select-absolute') {
-    selectAbsoluteByName(msg.name);
+    selectAbsoluteByName(msg.name, msg.typeFilter);
   } else if (msg.type === 'duplicate') {
     duplicateSelected();
   } else if (msg.type === 'delete-selected') {

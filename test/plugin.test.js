@@ -25,6 +25,17 @@ function lastType(messages) {
   return messages.length ? messages[messages.length - 1].type : null;
 }
 
+// Compare a selection to the exact nodes expected, by identity. Mock nodes hold
+// circular parent/selection references, so deepStrictEqual can't be used here.
+function assertSelection(figma, expected) {
+  var actual = figma.currentPage.selection;
+  var ids = function(nodes) { return nodes.map(function(n) { return n.type + ':' + n.id; }).join(', '); };
+  assert.strictEqual(ids(actual), ids(expected), 'expected [' + ids(expected) + '] but got [' + ids(actual) + ']');
+  for (var i = 0; i < expected.length; i++) {
+    assert.strictEqual(actual[i], expected[i], 'selection[' + i + '] should be the same node instance');
+  }
+}
+
 // --- tiny test runner -------------------------------------------------------
 var passed = 0;
 var failed = 0;
@@ -100,6 +111,84 @@ test('select-absolute only selects absolute-positioned matches', function() {
   assert.strictEqual(lastType(msgs), 'success');
   assert.strictEqual(figma.currentPage.selection.length, 1);
   assert.strictEqual(figma.currentPage.selection[0].layoutPositioning, 'ABSOLUTE');
+});
+
+// --- element type filter ----------------------------------------------------
+// Build a screen holding a component, an instance and a plain frame, all named
+// "Card", so only the filter can tell the matches apart.
+function makeTypeFixture() {
+  var comp = mock.makeNode({ name: 'Card', type: 'COMPONENT' });
+  var inst = mock.makeNode({ name: 'Card', type: 'INSTANCE' });
+  var frame = mock.makeNode({ name: 'Card', type: 'FRAME' });
+  var screen = mock.makeNode({ name: 'Screen', children: [comp, inst, frame] });
+  return { screen: screen, comp: comp, inst: inst, frame: frame };
+}
+
+test('select-frame with no type filter matches every type (default)', function() {
+  var f = makeTypeFixture();
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  var msgs = figma._send({ type: 'select-frame', name: 'Card' });
+  assert.strictEqual(lastType(msgs), 'success');
+  assert.strictEqual(figma.currentPage.selection.length, 3);
+});
+
+test('select-frame typeFilter "all" matches every type', function() {
+  var f = makeTypeFixture();
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'all' });
+  assert.strictEqual(figma.currentPage.selection.length, 3);
+});
+
+test('select-frame typeFilter "component" keeps components and instances only', function() {
+  var f = makeTypeFixture();
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  var msgs = figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'component' });
+  assert.strictEqual(lastType(msgs), 'success');
+  assertSelection(figma, [f.comp, f.inst]);
+});
+
+test('select-frame typeFilter "non-component" keeps the frame only', function() {
+  var f = makeTypeFixture();
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  var msgs = figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'non-component' });
+  assert.strictEqual(lastType(msgs), 'success');
+  assertSelection(figma, [f.frame]);
+});
+
+test('type filter reports an error when it filters out every name match', function() {
+  var comp = mock.makeNode({ name: 'Card', type: 'COMPONENT' });
+  var screen = mock.makeNode({ name: 'Screen', children: [comp] });
+  var figma = loadPlugin(mock.makeFigma([screen]));
+  var msgs = figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'non-component' });
+  assert.strictEqual(lastType(msgs), 'error');
+  assert.ok(/non-component/.test(msgs[msgs.length - 1].text), 'error should name the active filter');
+});
+
+test('type filter still descends into non-matching containers', function() {
+  // The wrapper frame is filtered out, but the component nested inside it is not.
+  var comp = mock.makeNode({ name: 'Card', type: 'COMPONENT' });
+  var wrapper = mock.makeNode({ name: 'Wrapper', type: 'FRAME', children: [comp] });
+  var screen = mock.makeNode({ name: 'Screen', children: [wrapper] });
+  var figma = loadPlugin(mock.makeFigma([screen]));
+  figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'component' });
+  assertSelection(figma, [comp]);
+});
+
+test('select-absolute honours the type filter', function() {
+  var absComp = mock.makeNode({ name: 'Card', type: 'COMPONENT', layoutPositioning: 'ABSOLUTE' });
+  var absFrame = mock.makeNode({ name: 'Card', type: 'FRAME', layoutPositioning: 'ABSOLUTE' });
+  var screen = mock.makeNode({ name: 'Screen', layoutMode: 'VERTICAL', children: [absComp, absFrame] });
+  var figma = loadPlugin(mock.makeFigma([screen]));
+  var msgs = figma._send({ type: 'select-absolute', name: 'Card', typeFilter: 'component' });
+  assert.strictEqual(lastType(msgs), 'success');
+  assertSelection(figma, [absComp]);
+});
+
+test('an unknown typeFilter value falls back to matching all types', function() {
+  var f = makeTypeFixture();
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'bogus' });
+  assert.strictEqual(figma.currentPage.selection.length, 3);
 });
 
 test('duplicate clones a free element and offsets it to the right', function() {

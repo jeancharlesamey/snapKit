@@ -10,6 +10,7 @@ A Figma plugin for managing prototype elements with absolute positioning, alignm
 ### Component Selection
 - **Select Component** - Find and select components by name (supports multiple names separated by commas, e.g., "Header, TapBar")
 - **Select Absolute** - Find and select only absolute-positioned components by name
+- **Element type filter** - The filter icon next to the name field opens a small popover to narrow a search to **All types** (default), **Components only** (components, variant sets, instances), or **Everything but components** (frames, groups, text, shapes...). A green dot on the icon shows when a filter is active, and the result message names what was searched.
 - Smart search: searches within selected frames, or all page frames if nothing is selected
 
 ### Layout Management
@@ -47,7 +48,8 @@ Alignment adapts to the selected element's context:
 The plugin runs entirely inside Figma, but its core logic (`code.js`) is covered
 by a dependency-free test suite that mocks the Figma plugin API and exercises
 every UI message handler (select, duplicate, set-to-absolute, align, remove,
-delete). Run it with Node:
+delete). A second suite extracts the UI html from `code.js` and runs its inline
+script against a small DOM stub to cover the popover wiring. Run both with Node:
 
 ```
 npm test
@@ -89,11 +91,18 @@ No `npm install` is required — the tests use only Node's built-in modules.
 1. Type multiple component names separated by commas: "Header, TapBar, Footer"
 2. Click "Select Component" to select all matching components at once
 
+#### Select Only Real Components (Ignore Same-Named Frames)
+1. Click the filter icon next to the name field
+2. Choose "Components only"
+3. Type the name and click "Select Component" — frames and groups with that name are skipped
+4. Choose "Everything but components" to do the opposite, or "All types" to reset
+
 
 ## TIPS
 
 - **Selection matters**: Most buttons become enabled/disabled based on your current selection
 - **Comma-separated names**: Search for multiple components at once (e.g., "Header, TapBar, Footer")
+- **Type filter is sticky**: It stays on the chosen type until you change it — the dot on the filter icon is the reminder that a search is narrowed
 - **Sections support**: Remove Absolute now works with Figma sections—it searches all frames within sections
 - **Alignment is context-aware**: Aligning an autolayout frame changes its internal alignment; aligning a child inside autolayout changes its cross-axis alignment; aligning an absolute element moves it via x/y
 
@@ -101,6 +110,9 @@ No `npm install` is required — the tests use only Node's built-in modules.
 ## RELEASE NOTES
 
 ### v0.0.4-alpha (April 30, 2026)
+**New Features:**
+- Added element type filter for name searches (issue #5, part 1 of 3): a filter icon next to the name field opens a popover with All types (default) / Components only / Everything but components. Applies to both Select Component and Select Absolute; the active filter is shown as a dot on the icon and named in the result message.
+
 **Improvements:**
 - Improved: Alignment buttons are now context-aware — no longer forces elements to absolute positioning
   - Autolayout frames: updates `primaryAxisAlignItems` / `counterAxisAlignItems`

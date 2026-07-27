@@ -4,6 +4,6 @@
   "description": "A Figma plugin for managing prototype elements with absolute positioning, alignment, and component selection.",
   "private": true,
   "scripts": {
-    "test": "node test/plugin.test.js"
+    "test": "node test/plugin.test.js && node test/ui.test.js"
   }
 }
