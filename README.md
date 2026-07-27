@@ -1,4 +1,4 @@
-# SnapKit v1.0.1-alpha
+# SnapKit v1.0.2-alpha
 
 A Figma plugin for managing prototype elements with absolute positioning, alignment, and component selection.
 
@@ -11,7 +11,8 @@ A Figma plugin for managing prototype elements with absolute positioning, alignm
 - **Select** - Find and select elements by name (supports multiple names separated by commas, e.g., "Header, TapBar")
 - **Select Absolute** - Find and select only absolute-positioned elements by name — leave the name empty to get every absolute element in scope
 - **Name wildcards** - `*` matches any sequence of characters, so `Section*` finds "Section 1" and "Section 2", and `*Nav*` finds anything containing "Nav"
-- **Element type filter** - The filter icon next to the name field opens a small popover to narrow a search to **All types** (default), **Components only** (components, variant sets, instances), or **Everything but components** (frames, groups, text, shapes...). A green dot on the icon shows when a filter is active, and the result message names what was searched
+- **Element type filter** - The filter icon next to the name field opens a small popover to narrow a search to **All types** (default), **Components only** (components, variant sets, instances), or **Everything but components** (frames, groups, text, shapes...). A **red dot** on the icon shows when a filter is active, and the result message names what was searched
+- **Explicit search context** - While a search runs, the loader spells out exactly what is being looked for: the kind of element (all elements or absolute only), the name(s) typed in the field (or *with any name* when it is empty), the active type filter and the scope — e.g. *Searching for absolute elements named “Header” — components only — inside the current selection*
 - Smart search: searches within selected frames, or all page frames if nothing is selected
 
 ### Layout Management
@@ -51,7 +52,8 @@ by a dependency-free test suite that mocks the Figma plugin API and exercises
 every UI message handler (select, duplicate, set-to-absolute, align, remove,
 delete). A second suite extracts the UI html from `code.js` and runs its inline
 script against a small DOM stub, covering the filter popover, the loader overlay
-and the context-aware button states. Run both with Node:
+and its search-context line, and the context-aware button states. Run both with
+Node:
 
 ```
 npm test
@@ -65,7 +67,7 @@ No `npm install` is required — the tests use only Node's built-in modules.
 ### Quick Start
 
 1. **Select frames (optional)** - Select frames to search within, or leave unselected to search the entire page
-2. **Find components** - Type a component name in the input field and click "Select Component"
+2. **Find components** - Type a component name in the input field and click "Select"
 3. **Position elements** - Use "Set to Absolute" and alignment buttons to position
 4. **Fine-tune** - Adjust positioning with alignment tools
 
@@ -73,14 +75,14 @@ No `npm install` is required — the tests use only Node's built-in modules.
 
 #### Sticky Header in Prototype
 1. Type "Header" in the input field
-2. Click "Select Component"
+2. Click "Select"
 3. Click "Set to Absolute"
 4. Click "Top" to align to top (header will now stick when scrolling)
 
 #### Fixed Bottom Navigation
 1. Select frames containing navigation
 2. Type "TapBar" or your navigation component name
-3. Click "Select Component"
+3. Click "Select"
 4. Click "Set to Absolute"
 5. Click "Bottom" to align to bottom
 
@@ -105,14 +107,22 @@ No `npm install` is required — the tests use only Node's built-in modules.
 - **Selection matters**: Most buttons become enabled/disabled based on your current selection
 - **Comma-separated names**: Search for multiple components at once (e.g., "Header, TapBar, Footer")
 - **Wildcards**: `*` stands for any sequence of characters — "Tab*Bar" and "*Nav*" both work
-- **Type filter is sticky**: It stays on the chosen type until you change it — the dot on the filter icon is the reminder that a search is narrowed
+- **Type filter is sticky**: It stays on the chosen type until you change it — the red dot on the filter icon is the reminder that a search is narrowed
+- **Read the loader**: If a search returns something unexpected, the line under the spinner tells you what the plugin actually looked for (name, type filter, scope)
 - **Sections support**: Remove Absolute now works with Figma sections—it searches all frames within sections
 - **Alignment is context-aware**: Aligning an autolayout frame changes its internal alignment; aligning a child inside autolayout changes its cross-axis alignment; aligning an absolute element moves it via x/y
 
 
 ## RELEASE NOTES
 
-### v1.0.1-alpha (in development)
+### v1.0.2-alpha (in development)
+**New Features:**
+- Explicit search context in the loader (part of issue #5): the spinner now carries a line describing the search in progress — element kind (all vs absolute only, from the button used), the name(s) typed (or "with any name" when the field is empty), the active element type filter and the scope (current selection vs whole page)
+
+**UI Changes:**
+- The "a filter is applied" dot on the filter icon is now red and larger (11px), so a narrowed search is impossible to miss
+
+### v1.0.1-alpha (July 27, 2026)
 **New Features:**
 - Added element type filter for name searches (issue #2, and part 1 of issue #5): a filter icon next to the name field opens a popover with All types (default) / Components only / Everything but components. Applies to both Select and Select Absolute; the active filter shows as a dot on the icon and is named in the result message.
 
@@ -185,4 +195,4 @@ For issues or feedback, please contact the plugin maintainer via github.
 
 ---
 
-**Current Version**: v0.0.4-alpha (in development)
+**Current Version**: v1.0.2-alpha (in development)
