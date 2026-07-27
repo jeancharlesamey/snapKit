@@ -258,6 +258,46 @@ test('the loader overlay shows during a search and hides on the result', functio
   assert.ok(!ui.el('overlay').classList.contains('show'), 'overlay should hide on error too');
 });
 
+test('the loader spells out what is being searched: name, type filter and scope', function() {
+  var ui = loadUi();
+  ui.el('frameName').value = 'Header';
+  ui.click(ui.el('selectBtn'));
+  var context = ui.el('overlayContext').textContent;
+  assert.ok(/Searching for elements/.test(context), 'should name what is searched: ' + context);
+  assert.ok(/Header/.test(context), 'should quote the searched name: ' + context);
+  assert.ok(/all types/.test(context), 'should name the active type filter: ' + context);
+  assert.ok(/across the whole page/.test(context), 'should name the scope: ' + context);
+});
+
+test('the loader context follows the type filter and the selection scope', function() {
+  var ui = loadUi();
+  ui.send({ type: 'selection-change', hasSelection: true, hasAbsolute: false, hasNonAbsolute: true, hasContainer: true });
+  ui.click(ui.option('component'));
+  ui.el('frameName').value = 'Card, Tile';
+  ui.click(ui.el('selectBtn'));
+  var context = ui.el('overlayContext').textContent;
+  assert.ok(/components only/.test(context), 'should name the chosen filter: ' + context);
+  assert.ok(/inside the current selection/.test(context), 'should say it stays in the selection: ' + context);
+  assert.ok(/Card/.test(context) && /Tile/.test(context), 'should list every name: ' + context);
+});
+
+test('Select absolute says absolute, and empty name reads as any name', function() {
+  var ui = loadUi();
+  ui.click(ui.el('selectAbsoluteBtn'));
+  var context = ui.el('overlayContext').textContent;
+  assert.ok(/absolute elements/.test(context), 'should say absolute elements: ' + context);
+  assert.ok(/with any name/.test(context), 'an empty field means any name: ' + context);
+});
+
+test('the active-filter dot is red and bigger than the old green one', function() {
+  var ui = loadUi();
+  var rule = ui.html.match(/\.icon-btn \.dot \{([^}]*)\}/);
+  assert.ok(rule, 'expected an .icon-btn .dot rule in the UI css');
+  assert.ok(/background: #DC2626/.test(rule[1]), 'the dot should be red: ' + rule[1]);
+  var size = rule[1].match(/width: (\d+)px/);
+  assert.ok(size && Number(size[1]) >= 10, 'the dot should be at least 10px wide: ' + rule[1]);
+});
+
 test('selection-change disables Set to absolute for an already-absolute selection', function() {
   var ui = loadUi();
   ui.send({ type: 'selection-change', hasSelection: true, hasAbsolute: true, hasNonAbsolute: false, hasContainer: false });
