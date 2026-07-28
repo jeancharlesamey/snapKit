@@ -12,8 +12,14 @@ A Figma plugin for managing prototype elements with absolute positioning, alignm
 - **Select Absolute** - Find and select only absolute-positioned elements by name — leave the name empty to get every absolute element in scope
 - **Name wildcards** - `*` matches any sequence of characters, so `Section*` finds "Section 1" and "Section 2", and `*Nav*` finds anything containing "Nav"
 - **Element type filter** - The filter icon next to the name field opens a small popover to narrow a search to **All types** (default), **Components only** (components, variant sets, instances), or **Everything but components** (frames, groups, text, shapes...). A **red dot** on the icon shows when a filter is active, and the result message names what was searched
-- **Explicit search context** - While a search runs, the loader spells out exactly what is being looked for: the kind of element (all elements or absolute only), the name(s) typed in the field (or *with any name* when it is empty), the active type filter and the scope — e.g. *Searching for absolute elements named “Header” — components only — inside the current selection*
+- **Visibility filter** - A radio group on one line under the name field picks what a search looks at: **Visible**, **Hidden**, or **All** (default). *Hidden* means the layer's own visibility is off (the eye icon in Figma) — opacity 0 or sitting inside a hidden parent are different states and are not treated as hidden. The search always descends into hidden containers, so a visible layer inside a hidden frame is still found. Combines with the type filter and with the name field: leave the name empty and pick *Hidden* to grab every hidden element in scope
+- **Explicit search context** - While a search runs, the loader spells out exactly what is being looked for: the kind of element (all elements or absolute only), the name(s) typed in the field (or *with any name* when it is empty), the active type filter, the visibility filter and the scope — e.g. *Searching for absolute elements named “Header” — components only — hidden elements only — inside the current selection*
 - Smart search: searches within selected frames, or all page frames if nothing is selected
+
+### Panel Layout
+The panel is grouped under two titles so the search controls and the things that change the document stay apart:
+- **Select** - the name field with its type-filter icon, the Visible / Hidden / All radio line, then **Select** and **Select absolute**
+- **Actions** - **Set to absolute** and **Set fixed scroll** on one line, then Duplicate, Remove absolute, Delete and the alignment grid
 
 ### Layout Management
 - **Duplicate selected** - Clone elements placed immediately next to the original (in autolayout flow, or to the right for absolute/free elements)
@@ -51,9 +57,9 @@ The plugin runs entirely inside Figma, but its core logic (`code.js`) is covered
 by a dependency-free test suite that mocks the Figma plugin API and exercises
 every UI message handler (select, duplicate, set-to-absolute, align, remove,
 delete). A second suite extracts the UI html from `code.js` and runs its inline
-script against a small DOM stub, covering the filter popover, the loader overlay
-and its search-context line, and the context-aware button states. Run both with
-Node:
+script against a small DOM stub, covering the filter popover, the visibility
+radio group, the Select / Actions sections, the loader overlay and its
+search-context line, and the context-aware button states. Run both with Node:
 
 ```
 npm test

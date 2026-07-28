@@ -306,6 +306,96 @@ test('select-absolute with an empty name honours the type filter', function() {
   assertSelection(figma, [frame]);
 });
 
+// --- visibility filter (part of issue #5) ------------------------------------
+// Two frames named "Card": one visible, one with its layer visibility off, so
+// only the visibility filter can tell them apart.
+function makeVisibilityFixture() {
+  var shown = mock.makeNode({ name: 'Card', type: 'FRAME', visible: true });
+  var hidden = mock.makeNode({ name: 'Card', type: 'FRAME', visible: false });
+  var untouched = mock.makeNode({ name: 'Card', type: 'FRAME' }); // never had `visible` set
+  var screen = mock.makeNode({ name: 'Screen', children: [shown, hidden, untouched] });
+  return { screen: screen, shown: shown, hidden: hidden, untouched: untouched };
+}
+
+test('select-frame with no visibility filter matches visible and hidden (default)', function() {
+  var f = makeVisibilityFixture();
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  figma._send({ type: 'select-frame', name: 'Card' });
+  assertSelection(figma, [f.shown, f.hidden, f.untouched]);
+});
+
+test('select-frame visibility "hidden" keeps the hidden element only', function() {
+  var f = makeVisibilityFixture();
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  var msgs = figma._send({ type: 'select-frame', name: 'Card', visibility: 'hidden' });
+  assert.strictEqual(lastType(msgs), 'success');
+  assertSelection(figma, [f.hidden]);
+});
+
+test('select-frame visibility "visible" skips the hidden element', function() {
+  var f = makeVisibilityFixture();
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  figma._send({ type: 'select-frame', name: 'Card', visibility: 'visible' });
+  assertSelection(figma, [f.shown, f.untouched]);
+});
+
+test('an unknown visibility filter falls back to matching everything', function() {
+  var f = makeVisibilityFixture();
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  figma._send({ type: 'select-frame', name: 'Card', visibility: 'nonsense' });
+  assertSelection(figma, [f.shown, f.hidden, f.untouched]);
+});
+
+test('the visibility filter still descends into hidden containers', function() {
+  // The wrapper is hidden, the card inside it is not: searching for visible
+  // elements must still reach the card.
+  var card = mock.makeNode({ name: 'Card', type: 'FRAME', visible: true });
+  var wrapper = mock.makeNode({ name: 'Wrapper', type: 'FRAME', visible: false, children: [card] });
+  var screen = mock.makeNode({ name: 'Screen', children: [wrapper] });
+  var figma = loadPlugin(mock.makeFigma([screen]));
+  figma._send({ type: 'select-frame', name: 'Card', visibility: 'visible' });
+  assertSelection(figma, [card]);
+});
+
+test('the visibility filter combines with the type filter', function() {
+  var comp = mock.makeNode({ name: 'Card', type: 'COMPONENT', visible: false });
+  var frame = mock.makeNode({ name: 'Card', type: 'FRAME', visible: false });
+  var shownComp = mock.makeNode({ name: 'Card', type: 'COMPONENT', visible: true });
+  var screen = mock.makeNode({ name: 'Screen', children: [comp, frame, shownComp] });
+  var figma = loadPlugin(mock.makeFigma([screen]));
+  figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'component', visibility: 'hidden' });
+  assertSelection(figma, [comp]);
+});
+
+test('both active filters are named in the result message', function() {
+  var f = makeVisibilityFixture();
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  var msgs = figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'non-component', visibility: 'hidden' });
+  var text = lastText(msgs);
+  assert.ok(/non-component elements only/.test(text), 'should name the type filter: ' + text);
+  assert.ok(/hidden only/.test(text), 'should name the visibility filter: ' + text);
+});
+
+test('the visibility filter is named in the error when nothing matches', function() {
+  var screen = mock.makeNode({ name: 'Screen', children: [mock.makeNode({ name: 'Card', visible: true })] });
+  var figma = loadPlugin(mock.makeFigma([screen]));
+  var msgs = figma._send({ type: 'select-frame', name: 'Card', visibility: 'hidden' });
+  assert.strictEqual(lastType(msgs), 'error');
+  assert.ok(/hidden only/.test(lastText(msgs)), 'error should name the filter: ' + lastText(msgs));
+});
+
+test('select-absolute honours the visibility filter, with or without a name', function() {
+  var hidden = mock.makeNode({ name: 'Header', type: 'FRAME', visible: false, layoutPositioning: 'ABSOLUTE' });
+  var shown = mock.makeNode({ name: 'Header', type: 'FRAME', visible: true, layoutPositioning: 'ABSOLUTE' });
+  var screen = mock.makeNode({ name: 'Screen', layoutMode: 'VERTICAL', children: [hidden, shown] });
+  var figma = loadPlugin(mock.makeFigma([screen]));
+  figma._send({ type: 'select-absolute', name: 'Header', visibility: 'hidden' });
+  assertSelection(figma, [hidden]);
+
+  figma._send({ type: 'select-absolute', name: '', visibility: 'hidden' });
+  assertSelection(figma, [hidden]);
+});
+
 test('duplicate clones a free element and offsets it to the right', function() {
   var box = mock.makeNode({ name: 'Box', x: 10, y: 20, width: 100, height: 50 });
   var frame = mock.makeNode({ name: 'Canvas', children: [box] });
