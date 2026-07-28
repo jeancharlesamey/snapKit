@@ -23,7 +23,8 @@ figma.on('selectionchange', function() {
       hasContainer = true;
     }
   }
-  figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection, hasAbsolute: hasAbsolute, hasNonAbsolute: hasNonAbsolute, hasContainer: hasContainer });
+  // count feeds the "Selection (n)" title, which outlives the result toast.
+  figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection, hasAbsolute: hasAbsolute, hasNonAbsolute: hasNonAbsolute, hasContainer: hasContainer, count: selection.length });
 });
 
 // Match a node name against a pattern. * is a wildcard that matches any sequence of characters.
@@ -724,6 +725,6 @@ figma.ui.onmessage = function(msg) {
         hasContainer = true;
       }
     }
-    figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection, hasAbsolute: hasAbsolute, hasNonAbsolute: hasNonAbsolute, hasContainer: hasContainer });
+    figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection, hasAbsolute: hasAbsolute, hasNonAbsolute: hasNonAbsolute, hasContainer: hasContainer, count: sel.length });
   }
 };

@@ -25,10 +25,12 @@ var overlayContext = document.getElementById('overlayContext');
 var filterBtn = document.getElementById('filterBtn');
 var filterPopover = document.getElementById('filterPopover');
 var filterOptions = filterPopover.querySelectorAll('.select-menu__item');
+var clearNameBtn = document.getElementById('clearName');
+var selectionCount = document.getElementById('selectionCount');
 var visibilityRadios = [
+  document.getElementById('visAll'),
   document.getElementById('visVisible'),
-  document.getElementById('visHidden'),
-  document.getElementById('visAll')
+  document.getElementById('visHidden')
 ];
 
 var typeFilter = 'all';
@@ -49,6 +51,15 @@ for (var vi = 0; vi < visibilityRadios.length; vi++) {
     setVisibilityFilter(this.getAttribute('data-visibility'));
   };
 }
+
+// --- name field -------------------------------------------------------------
+
+// The X is shown/hidden by css off :placeholder-shown, so emptying the field is
+// all this has to do.
+clearNameBtn.onclick = function() {
+  frameNameInput.value = '';
+  if (frameNameInput.focus) frameNameInput.focus();
+};
 
 // --- element type filter ----------------------------------------------------
 
@@ -202,12 +213,19 @@ window.onmessage = function(event) {
     hideOverlay();
     showMessage(msg.text, 'error');
   } else if (msg.type === 'selection-change') {
-    updateButtonStates(msg.hasSelection, msg.hasAbsolute, msg.hasNonAbsolute, msg.hasContainer);
+    updateButtonStates(msg.hasSelection, msg.hasAbsolute, msg.hasNonAbsolute, msg.hasContainer, msg.count);
   }
 };
 
-function updateButtonStates(hasSelection, hasAbsolute, hasNonAbsolute, hasContainer) {
+// The toast that announces a search result is gone after 3s; the title keeps the
+// number on screen for as long as the selection lives.
+function setSelectionCount(count) {
+  selectionCount.textContent = '(' + (count || 0) + ')';
+}
+
+function updateButtonStates(hasSelection, hasAbsolute, hasNonAbsolute, hasContainer, count) {
   hasSelectionScope = hasSelection;
+  setSelectionCount(count);
   var baseButtons = [duplicateBtn, deleteBtn, alignLeftBtn, alignCenterBtn, alignRightBtn, alignTopBtn, alignMiddleBtn, alignBottomBtn];
   for (var i = 0; i < baseButtons.length; i++) {
     baseButtons[i].disabled = !hasSelection;
@@ -220,3 +238,4 @@ function updateButtonStates(hasSelection, hasAbsolute, hasNonAbsolute, hasContai
 parent.postMessage({ pluginMessage: { type: 'check-selection' } }, '*');
 setTypeFilter(typeFilter);
 setVisibilityFilter(visibilityFilter);
+setSelectionCount(0);

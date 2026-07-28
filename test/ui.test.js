@@ -70,7 +70,8 @@ function makeElement(id, attrs) {
       }
     },
     getAttribute: function(name) { return el._attrs[name] != null ? el._attrs[name] : null; },
-    querySelectorAll: function() { return []; }
+    querySelectorAll: function() { return []; },
+    focus: function() { el._focused = true; }
   };
   return el;
 }
@@ -235,21 +236,36 @@ test('Select sends the name and the active type filter', function() {
   assert.deepStrictEqual(ui.lastPosted(), { type: 'select-frame', name: 'Card', typeFilter: 'component', visibility: 'all' });
 });
 
-test('the visibility radios are Visible / Hidden / All, with All preselected', function() {
+test('the visibility radios are All / Visible / Hidden, with All preselected', function() {
   var ui = loadUi();
   var labels = ui.html.match(/data-visibility="(\w+)"/g).map(function(m) { return m.split('"')[1]; });
-  assert.deepStrictEqual(labels, ['visible', 'hidden', 'all']);
+  assert.deepStrictEqual(labels, ['all', 'visible', 'hidden']);
   assert.strictEqual(ui.el('visAll').checked, true, 'All should start selected');
   assert.strictEqual(ui.el('visVisible').checked, false);
   assert.strictEqual(ui.el('visHidden').checked, false);
 });
 
-test('the three visibility radios sit on one line under a Select title', function() {
+test('the three visibility radios share one line in even columns', function() {
   var ui = loadUi();
-  assert.ok(/<div class="section-title">Select<\/div>/.test(ui.html), 'expected a Select section title');
-  var rule = cssRule('.snapkit-radios');
-  assert.ok(rule && /display: flex/.test(rule), 'the radio row should be a single flex line: ' + rule);
+  var row = cssRule('.snapkit-radios');
+  assert.ok(row && /display: flex/.test(row), 'the radio row should be a single flex line: ' + row);
+  var cell = cssRule('.snapkit-radios .radio');
+  assert.ok(cell && /flex: 1 1 0/.test(cell), 'each radio should take an equal share of the line: ' + cell);
   assert.ok(/class="radio__button"/.test(ui.html), 'the radios should use the design system radio');
+});
+
+test('the search section is titled Selection and carries the count', function() {
+  var ui = loadUi();
+  assert.ok(/<div class="section-title">Selection <span id="selectionCount">/.test(ui.html),
+    'expected a Selection title with the count beside it');
+  assert.strictEqual(ui.el('selectionCount').textContent, '(0)', 'nothing selected reads as (0)');
+
+  ui.send({ type: 'selection-change', hasSelection: true, hasAbsolute: false, hasNonAbsolute: true, hasContainer: true, count: 9 });
+  assert.strictEqual(ui.el('selectionCount').textContent, '(9)',
+    'the title should keep the number on screen after the toast is gone');
+
+  ui.send({ type: 'selection-change', hasSelection: false, hasAbsolute: false, hasNonAbsolute: false, hasContainer: false, count: 0 });
+  assert.strictEqual(ui.el('selectionCount').textContent, '(0)', 'deselecting should reset the count');
 });
 
 test('the Actions title comes before the absolute / fixed scroll line', function() {
@@ -375,6 +391,39 @@ test('the search field keeps the icon-button grey fill at rest and on focus', fu
   var box = cssRule('.input__field');
   assert.ok(box && /height: var\(--size-medium\)/.test(box) && /margin: 0/.test(box),
     'the grey field should be as tall as the icon button beside it: ' + box);
+});
+
+test('the search field is rounded like the buttons, not like a DS input', function() {
+  var box = cssRule('.input__field');
+  assert.ok(box && /border-radius: var\(--border-radius-large\)/.test(box),
+    'the field should take the 6px button radius, not the DS 2px one: ' + box);
+  assert.ok(/\.button \{[^}]*border-radius: var\(--border-radius-large\)/.test(HTML),
+    'the DS button radius should still be the large token');
+});
+
+test('focusing the search field draws a black ring, not the DS blue one', function() {
+  var focus = cssRule('.input__field:active,\n.input__field:focus,\n.input__field:focus:placeholder-shown');
+  assert.ok(focus, 'expected a focus override for the field');
+  assert.ok(/border-color: var\(--black\)/.test(focus), 'the focus border should be black: ' + focus);
+  assert.ok(/outline-color: var\(--black\)/.test(focus),
+    'the DS draws the ring as an inset outline too, so that has to go black as well: ' + focus);
+  // The empty field has its own DS focus rule at the same weight, so the
+  // override has to name that case too or a focused empty field stays blue.
+  assert.ok(/\.input__field:focus:placeholder-shown \{[^}]*var\(--blue\)/.test(HTML),
+    'the DS should still be the reason the empty-focused selector is listed');
+});
+
+test('a filled field offers an X that empties it', function() {
+  var ui = loadUi();
+  var shown = cssRule('.input__field:not(:placeholder-shown) ~ .snapkit-clear');
+  assert.ok(shown && /display: flex/.test(shown), 'the X should appear once the field has content: ' + shown);
+  var hidden = cssRule('.snapkit-clear');
+  assert.ok(hidden && /display: none/.test(hidden), 'the X should be hidden while the field is empty: ' + hidden);
+  assert.ok(/id="clearName"[\s\S]*?icon--close/.test(ui.html), 'the clear button should use the DS close icon');
+
+  ui.el('frameName').value = 'Card';
+  ui.click(ui.el('clearName'));
+  assert.strictEqual(ui.el('frameName').value, '', 'clicking the X should empty the field');
 });
 
 test('the filter trigger keeps its glyph centred and solid', function() {

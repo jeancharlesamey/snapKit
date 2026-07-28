@@ -19,9 +19,9 @@ SnapKit is built with [figma-plugin-ds](https://github.com/thomas-lowry/figma-pl
 The panel is split into two titled sections so searching never gets mixed up with changing the document:
 
 ```
-SELECT
-  [ 🔍 Name(s) comma separated, * as wildcard... ] [⚙]  ← filter icon (element type)
-  ( ) Visible      ( ) Hidden      (o) All              ← visibility, one line
+SELECTION (9)                                         ← how many are selected now
+  [ 🔍 Name(s) comma separated, * ...  ✕ ] [⚙]        ← ✕ clears it, ⚙ = element type
+  (o) All          ( ) Visible     ( ) Hidden         ← visibility, one line
   [ Select ]                       [ Select absolute ]
 
 ACTIONS
@@ -33,13 +33,13 @@ ACTIONS
   [ ↑ ] [ ↕ ] [ ↓ ]                                     ← align vertically
 ```
 
-Everything under **Select** only reads the file. Everything under **Actions** modifies it — the two destructive ones, *Delete absolute* and *Delete selected*, are the red buttons.
+The **Selection** title carries the number of elements currently selected, so the result of a search is still readable after the toast that announced it has faded. Everything under **Selection** only reads the file. Everything under **Actions** modifies it — the two destructive ones, *Delete absolute* and *Delete selected*, are the red buttons.
 
 
-## SELECT
+## SELECTION
 
 ### Search by name
-Type one or more names in the field and press **Select**. Names are comma separated, so `Header, TapBar, Footer` finds all three in one pass. The search is recursive: it walks into sections, frames and groups, not just the top level.
+Type one or more names in the field and press **Select**. Names are comma separated, so `Header, TapBar, Footer` finds all three in one pass. The search is recursive: it walks into sections, frames and groups, not just the top level. Once the field has something in it, an **✕** appears at its right end to empty it in one click.
 
 `*` is a wildcard for any sequence of characters:
 
@@ -64,9 +64,9 @@ Use it when a frame and a real component share a name and you only want one of t
 ### Visibility filter
 The radio group under the name field decides what a search looks at:
 
+- **All** (default) — both
 - **Visible** — only layers currently shown
 - **Hidden** — only layers whose own visibility is off
-- **All** (default) — both
 
 **"Hidden" means the layer's own eye icon is off.** Opacity 0, or a visible layer sitting inside a hidden parent, are different states and are *not* treated as hidden. The search still descends into hidden containers, so a visible layer inside a hidden frame is found by the *Visible* filter.
 
@@ -189,7 +189,7 @@ npm run build:ui
 The plugin runs inside Figma, but its logic is covered by a dependency-free test suite that mocks the Figma plugin API:
 
 - `test/plugin.test.js` — every UI message handler (select, select absolute, duplicate, set to absolute, align, delete absolute, delete), including the type and visibility filters
-- `test/ui.test.js` — reads the built `ui.html` and runs its inline script against a small DOM stub, covering the type filter menu, the visibility radio group, the Select / Actions sections, the loader overlay and its search-context line, the context-aware button states, and that nothing in the panel is loaded from the network
+- `test/ui.test.js` — reads the built `ui.html` and runs its inline script against a small DOM stub, covering the type filter menu, the visibility radio group, the Selection / Actions sections, the selection count and the field's clear button, the loader overlay and its search-context line, the context-aware button states, and that nothing in the panel is loaded from the network
 
 ```
 npm test
