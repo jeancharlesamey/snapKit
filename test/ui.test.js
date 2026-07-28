@@ -1,8 +1,8 @@
-// SnapKit UI tests. The panel is built from ui/index.html + ui/snapkit.css +
-// ui/snapkit.js into ui.html (see scripts/build-ui.js), so this reads the built
-// file, runs its inline <script> against a tiny DOM stub, and asserts the
-// wiring: the element-type filter menu, the visibility radio group, the loader
-// overlay and the context-aware button states.
+// SnapKit UI tests. The panel is built from ui/index.html + ui/ds-overrides.css
+// + ui/snapkit.css + ui/snapkit.js into ui.html (see scripts/build-ui.js), so
+// this reads the built file, runs its inline <script> against a tiny DOM stub,
+// and asserts the wiring: the element-type filter menu, the visibility radio
+// group, the loader overlay and the context-aware button states.
 // No dependencies — run with: node test/ui.test.js
 
 'use strict';
@@ -24,11 +24,22 @@ function extractUi() {
   return { html: HTML, script: script[1] };
 }
 
-// The SnapKit styles, without the 2000 vendored design-system rules in front.
-function snapkitCss() {
-  var marked = HTML.split('/* snapkit.css */');
-  assert.strictEqual(marked.length, 2, 'expected the snapkit.css block in ui.html');
+// One inlined stylesheet out of the built file. The build labels each block with
+// the source path it came from.
+function cssBlock(name) {
+  var marked = HTML.split('/* ' + name + ' */');
+  assert.strictEqual(marked.length, 2, 'expected the ' + name + ' block in ui.html');
   return marked[1].split('</style>')[0];
+}
+
+// Everything SnapKit wrote — the DS overrides and its own styles — without the
+// 2000 vendored design-system rules in front.
+function snapkitCss() {
+  return cssBlock('ds-overrides.css') + '\n' + cssBlock('snapkit.css');
+}
+
+function withoutComments(css) {
+  return css.replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
 function cssRule(selector) {
@@ -440,6 +451,19 @@ test('the icon buttons carry the grey fill at rest, not only on hover', function
   assert.ok(!/background-color: transparent/.test(rule), 'no transparent resting state left: ' + rule);
 });
 
+test('the magnifier is the same grey as the placeholder beside it', function() {
+  var ui = loadUi();
+  var rule = cssRule('.input .icon--search');
+  assert.ok(rule && /opacity: 0\.3/.test(rule) && /filter: none/.test(rule),
+    'the glyph is a black svg, so 30% opacity and no tint filter is exactly the ' +
+    'placeholder grey: ' + rule);
+  assert.ok(/\.input__field::placeholder \{[^}]*color: var\(--black3\)/.test(HTML),
+    'the DS placeholder should still be --black3');
+  assert.ok(/--black3: rgba\(0, 0, 0, \.3\)/.test(HTML), 'that token should be black at 30%');
+  assert.ok(!/icon--search[^>]*icon--black3/.test(ui.html),
+    'stacking icon--black3 on the DS opacity is what made the magnifier too light');
+});
+
 test('the magnifier drops out once the field has something in it', function() {
   var ui = loadUi();
   assert.ok(ui.html.indexOf('id="frameName"') < ui.html.indexOf('icon icon--search'),
@@ -507,6 +531,33 @@ test('the panel is built on the vendored figma-plugin-ds', function() {
       'expected the design system class "' + cls + '" in the panel');
   });
   assert.ok(/--blue: #18a0fb/.test(ui.html), 'expected the design system tokens to be inlined');
+});
+
+// The overrides are what an upstream design-system release can break, so they
+// are kept in one file and the vendored copy is never patched. This pins that
+// contract: ui/snapkit.css must not style a DS class.
+test('the design system is only overridden from ui/ds-overrides.css', function() {
+  var DS_CLASS = /\.(button|icon|input|radio|section-title|select-menu|label|type)[\w-]*/g;
+
+  var leaked = withoutComments(cssBlock('snapkit.css')).match(DS_CLASS);
+  assert.ok(!leaked, 'SnapKit\'s own stylesheet should not style a design-system ' +
+    'class — move it to ui/ds-overrides.css: ' + leaked);
+
+  var overrides = withoutComments(cssBlock('ds-overrides.css')).match(DS_CLASS);
+  assert.ok(overrides && overrides.length > 10,
+    'the overrides file should be where the DS classes are restyled');
+
+  assert.ok(!/snapkit/i.test(cssBlock('vendor/figma-plugin-ds/figma-plugin-ds.css')),
+    'the vendored design system must stay unpatched so it can be dropped in wholesale');
+});
+
+test('the stylesheets are inlined design system, then overrides, then SnapKit', function() {
+  var ds = HTML.indexOf('/* vendor/figma-plugin-ds/figma-plugin-ds.css */');
+  var overrides = HTML.indexOf('/* ds-overrides.css */');
+  var own = HTML.indexOf('/* snapkit.css */');
+  assert.ok(ds !== -1 && overrides !== -1 && own !== -1, 'expected all three css blocks');
+  assert.ok(ds < overrides, 'the overrides have to come after the design system to win on source order');
+  assert.ok(overrides < own, 'SnapKit\'s own styles come last');
 });
 
 test('the built panel pulls nothing from the network', function() {

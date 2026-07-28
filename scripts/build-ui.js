@@ -4,8 +4,10 @@
 // Figma serves the UI from a sandboxed iframe with no document base, so a
 // <link> or a <script src> to a sibling file never resolves. This script takes
 // ui/index.html and inlines every local stylesheet and script it references,
-// which is what lets the sources stay split (vendored design system / SnapKit
-// styles / SnapKit script) instead of living in one unreadable blob.
+// which is what lets the sources stay split (vendored design system / the local
+// overrides of it / SnapKit's own styles / SnapKit script) instead of living in
+// one unreadable blob. Order is taken from ui/index.html and matters: the DS
+// first, then ui/ds-overrides.css, so the overrides win on source order.
 //
 //   node scripts/build-ui.js          rebuild ui.html
 //   node scripts/build-ui.js --check  fail if ui.html is out of date
@@ -25,13 +27,15 @@ var OUTPUT = path.join(ROOT, 'ui.html');
 var BANNER = [
   '<!-- GENERATED FILE — do not edit.',
   '     Built from ui/index.html by scripts/build-ui.js (npm run build:ui).',
-  '     Edit ui/index.html, ui/snapkit.css or ui/snapkit.js instead. -->'
+  '     Edit ui/index.html, ui/ds-overrides.css, ui/snapkit.css',
+  '     or ui/snapkit.js instead. -->'
 ].join('\n');
 
 // The vendored design system pulls Inter from rsms.me. A Figma plugin has no
 // network access unless the manifest asks for it, and asking would defeat the
-// point of vendoring, so remote webfonts are dropped and ui/snapkit.css falls
-// back to a local font stack. Doing it here keeps the vendored file pristine.
+// point of vendoring, so remote webfonts are dropped and ui/ds-overrides.css
+// falls back to a local font stack. Doing it here keeps the vendored file
+// pristine.
 function stripRemoteFontFaces(css) {
   var out = '';
   var index = 0;

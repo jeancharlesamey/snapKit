@@ -1,16 +1,21 @@
 <!DOCTYPE html>
 <!-- GENERATED FILE — do not edit.
      Built from ui/index.html by scripts/build-ui.js (npm run build:ui).
-     Edit ui/index.html, ui/snapkit.css or ui/snapkit.js instead. -->
+     Edit ui/index.html, ui/ds-overrides.css, ui/snapkit.css
+     or ui/snapkit.js instead. -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SnapKit</title>
-  <!-- Both stylesheets and the script are inlined into the built ui.html by
+  <!-- The stylesheets and the script are inlined into the built ui.html by
        scripts/build-ui.js — Figma serves the plugin UI from a sandboxed iframe
        that cannot resolve relative files. Open this file directly in a browser
-       to preview the panel. -->
+       to preview the panel.
+
+       Order matters: the vendored design system first, then the local overrides
+       of it (the only file that touches a DS class, so an upstream drop-in has
+       one file to re-check), then SnapKit's own layout and components. -->
 <style>
 /* vendor/figma-plugin-ds/figma-plugin-ds.css */
 /* Vars */
@@ -2017,15 +2022,29 @@ select.select-menu {
 }
 </style>
 <style>
-/* snapkit.css */
-/* SnapKit — the thin layer on top of figma-plugin-ds.
+/* ds-overrides.css */
+/* SnapKit — the local overrides for the vendored figma-plugin-ds.
  *
- * Everything that looks like a Figma control (buttons, input, radios, the type
- * menu, the icons) comes from the vendored design system. This file only does
- * three things: layout, a couple of button/icon-button resets the DS does not
- * ship, and the two components the DS has no equivalent for — the toast and the
- * search overlay. Anything added here should use the DS tokens, never raw
- * colours or font sizes.
+ * This is the only stylesheet that names a design-system class, and the
+ * vendored file itself is never patched. An upstream release is therefore a
+ * single file drop (see ui/vendor/figma-plugin-ds/README.md) followed by a
+ * re-read of this one file: everything that can break when the DS changes a
+ * selector, a specificity or a property lives here, and nowhere else.
+ *
+ * The build inlines it straight after the design system and before SnapKit's
+ * own styles (scripts/build-ui.js), so at equal specificity these rules win on
+ * source order.
+ *
+ * Where a rule goes — the split is by selector, so it can be checked
+ * mechanically (test/ui.test.js does):
+ *
+ *   - selector names a DS class (.button, .input__field, .radio__label, .icon,
+ *     .section-title, …) or a DS custom property  ->  this file
+ *   - selector names only .snapkit-* classes  ->  ui/snapkit.css
+ *
+ * A SnapKit class may appear here when it is what pins the override to one
+ * place in the panel (`.snapkit-radios .radio`). Anything added here should use
+ * the DS tokens, never raw colours or font sizes.
  */
 
 :root {
@@ -2044,49 +2063,10 @@ select.select-menu {
   box-sizing: border-box;
 }
 
+/* The DS hard-codes `font-family: 'Inter', sans-serif` on <body> rather than
+   reading its own token, so overriding --font-stack is not enough. */
 body {
   font-family: var(--font-stack);
-  padding: var(--size-xxsmall);
-  background-color: var(--white);
-}
-
-/* --- layout --------------------------------------------------------------- */
-
-.snapkit {
-  display: flex;
-  flex-direction: column;
-  gap: var(--size-xxxsmall);
-}
-
-.snapkit-row {
-  display: flex;
-  align-items: center;
-  gap: var(--size-xxxsmall);
-}
-
-.snapkit-row__grow {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.snapkit-grid {
-  display: grid;
-  gap: var(--size-xxxsmall);
-}
-
-.snapkit-grid--2 { grid-template-columns: 1fr 1fr; }
-.snapkit-grid--3 { grid-template-columns: repeat(3, 1fr); }
-
-/* DS buttons hug their label; in a grid or on their own line they should fill
-   the row and centre the label. */
-.snapkit-block,
-.snapkit-grid .button {
-  width: 100%;
-  justify-content: center;
-}
-
-.snapkit-grid .icon-button {
-  width: 100%;
 }
 
 /* --- button / icon-button resets ------------------------------------------ */
@@ -2131,6 +2111,19 @@ body {
   cursor: default;
 }
 
+/* DS buttons hug their label; in a grid or on their own line they should fill
+   the row and centre the label. (.snapkit-block only ever sits on a .button —
+   it is the "this one is on its own line" flag.) */
+.snapkit-block,
+.snapkit-grid .button {
+  width: 100%;
+  justify-content: center;
+}
+
+.snapkit-grid .icon-button {
+  width: 100%;
+}
+
 /* --- section titles ------------------------------------------------------- */
 
 /* The DS indents its titles by 8px. The buttons below start at the body edge,
@@ -2146,10 +2139,11 @@ body {
    while the field was white, but now that both carry the same grey the mismatch
    is the first thing you see, so the field takes the icon-button height. The
    DS positions .input .icon at top:0 with a 32px box, so it lands dead centre
-   once the margin is gone. */
-   The DS gives the field the 2px small radius and the buttons the 6px large
-   one; on a row where a field sits next to an icon button the two radii read as
-   a mistake, so the field takes the button's. */
+   once the margin is gone.
+
+   The DS also gives the field the 2px small radius and the buttons the 6px
+   large one; on a row where a field sits next to an icon button the two radii
+   read as a mistake, so the field takes the button's. */
 .input__field {
   height: var(--size-medium);
   margin: 0;
@@ -2180,6 +2174,17 @@ body {
   outline-color: var(--black);
 }
 
+/* The magnifier should read as exactly the grey of the placeholder beside it.
+   The placeholder is `color: var(--black3)` — plain black at 30% — and the
+   glyph is a black svg, so the DS's own `.input .icon { opacity: .3 }` already
+   lands there; what made the icon lighter was stacking `.icon--black3`'s invert
+   filter on top of that opacity. The class is gone from the markup; pinning
+   both values here keeps the pairing if the DS changes either. */
+.input .icon--search {
+  opacity: 0.3;
+  filter: none;
+}
+
 /* Once something is typed the magnifier is noise: hide it, hand the text the
    32px it was reserving on the left, and reserve the same on the right for the
    clear button that takes its place. */
@@ -2192,23 +2197,8 @@ body {
   display: none;
 }
 
-/* The X only exists while there is something to clear. It fills the 32px the
-   filled field keeps free on the right. */
-.snapkit-clear {
-  display: none;
-  position: absolute;
-  top: 0;
-  right: 0;
-  align-items: center;
-  justify-content: center;
-  width: var(--size-medium);
-  height: var(--size-medium);
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-
+/* The other half of that swap: the X (styled in the SnapKit stylesheet) only
+   exists while there is something to clear. */
 .input__field:not(:placeholder-shown) ~ .snapkit-clear {
   display: flex;
 }
@@ -2227,11 +2217,6 @@ body {
 }
 
 /* --- visibility radios ---------------------------------------------------- */
-
-.snapkit-radios {
-  display: flex;
-  align-items: center;
-}
 
 .snapkit-radios .radio {
   flex: 1 1 0;
@@ -2273,15 +2258,6 @@ body {
 
 /* --- element type filter -------------------------------------------------- */
 
-.snapkit-filter {
-  flex: 0 0 var(--size-medium);
-}
-
-.snapkit-filter__button {
-  position: relative;
-  flex: none;
-}
-
 /* The trigger lives inside .select-menu so the DS menu can anchor to it, which
    also drags in `.select-menu .icon` — a rule meant for the icon that precedes
    a select's label, so it shifts the glyph 8px left and 2px up and fades it to
@@ -2290,6 +2266,95 @@ body {
 .snapkit-filter__button .icon {
   margin: 0;
   opacity: 1;
+}
+</style>
+<style>
+/* snapkit.css */
+/* SnapKit — the panel's own styles.
+ *
+ * Everything that looks like a Figma control (buttons, input, radios, the type
+ * menu, the icons) comes from the vendored design system, and every local change
+ * to one of those controls lives in ds-overrides.css. This file is only the
+ * layout and the two components the DS has no equivalent for — the toast and the
+ * search overlay.
+ *
+ * It never styles a design-system class: it may lean on one to find an element
+ * (`.input__field:not(:placeholder-shown) ~ .snapkit-clear` is in the overrides
+ * file for that reason), but every declaration here lands on a .snapkit-*
+ * element of our own. That keeps an upstream DS release to one file to re-read.
+ * Values are DS tokens, never raw colours or font sizes.
+ */
+
+body {
+  padding: var(--size-xxsmall);
+  background-color: var(--white);
+}
+
+/* --- layout --------------------------------------------------------------- */
+
+.snapkit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-xxxsmall);
+}
+
+.snapkit-row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-xxxsmall);
+}
+
+.snapkit-row__grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.snapkit-grid {
+  display: grid;
+  gap: var(--size-xxxsmall);
+}
+
+.snapkit-grid--2 { grid-template-columns: 1fr 1fr; }
+.snapkit-grid--3 { grid-template-columns: repeat(3, 1fr); }
+
+/* --- clear button in the search field ------------------------------------- */
+
+/* The X fills the 32px the filled field keeps free on its right. It is hidden
+   until there is something to clear — that half of the swap needs the field's
+   :placeholder-shown state, so it sits in ds-overrides.css. */
+.snapkit-clear {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-medium);
+  height: var(--size-medium);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+/* --- visibility radios ---------------------------------------------------- */
+
+/* One line, three even columns. The circles themselves need DS surgery to line
+   up — see ds-overrides.css. */
+.snapkit-radios {
+  display: flex;
+  align-items: center;
+}
+
+/* --- element type filter -------------------------------------------------- */
+
+.snapkit-filter {
+  flex: 0 0 var(--size-medium);
+}
+
+.snapkit-filter__button {
+  position: relative;
+  flex: none;
 }
 
 .snapkit-filter__dot {
@@ -2302,7 +2367,7 @@ body {
   border-radius: 50%;
   background-color: var(--red);
   border: 2px solid var(--white);
-  /* .icon-button * paints its children black — the dot has to opt out. */
+  /* The DS paints every child of an icon button black — the dot has to opt out. */
   filter: none;
 }
 
@@ -2431,7 +2496,11 @@ body {
              (there is no previous-sibling selector to pair with
              :placeholder-shown). -->
         <input id="frameName" type="text" class="input__field" placeholder="Name(s) comma separated, * as wildcard...">
-        <div class="icon icon--search icon--black3"></div>
+        <!-- No icon--black3 here: that filter on top of the DS's own 30% opacity
+             made the magnifier much lighter than the placeholder. Plain black at
+             the DS opacity is the placeholder grey exactly — see
+             ds-overrides.css. -->
+        <div class="icon icon--search"></div>
         <button id="clearName" class="snapkit-clear" title="Clear the name field">
           <div class="icon icon--close icon--black8"></div>
         </button>
