@@ -2141,6 +2141,17 @@ body {
 
 /* --- search field --------------------------------------------------------- */
 
+/* The DS field is 30px tall with a 1px margin above and below, which leaves it
+   2px shorter than the 32px icon button sitting next to it. That went unnoticed
+   while the field was white, but now that both carry the same grey the mismatch
+   is the first thing you see, so the field takes the icon-button height. The
+   DS positions .input .icon at top:0 with a 32px box, so it lands dead centre
+   once the margin is gone. */
+.input__field {
+  height: var(--size-medium);
+  margin: 0;
+}
+
 /* The DS field is white with a hairline border and only fills in on hover.
    SnapKit keeps that fill as the resting state — same grey as the icon buttons
    — so the field reads as an input without needing the border. */
@@ -2187,14 +2198,19 @@ body {
   padding-right: 0;
 }
 
-/* The DS draws the circle as a 10px box plus a 1px border and drops the 6px
-   selected dot at 2px/2px — geometry that only centres under content-box
-   sizing. The border-box reset at the top of this file shrank the circle to
-   8px inside, which pushed the dot down and to the right; opt this one element
-   back out. The top margin goes too: the label is a centred flex line, so the
-   DS baseline nudge only tips the circle off-centre against its text. */
+/* The DS drops the 6px selected dot at a hard-coded `2px 2px`, which only lands
+   in the middle if the circle's padding box happens to be 10px. Under the DS's
+   own `* { box-sizing: border-box }` the 1px border eats into the 10px box and
+   leaves 8px, so the dot sits 2px from the top-left and flush against the
+   bottom-right — the off-centre circle. Centring the dot instead of measuring
+   it fixes that without resizing the circle away from the DS's 10px. */
+.radio__button:checked + .radio__label:before {
+  background-position: center;
+}
+
+/* The label is a centred flex line, so the DS's 2px baseline nudge only tips
+   the circle off-centre against its own text. */
 .radio__label:before {
-  box-sizing: content-box;
   margin-top: 0;
 }
 
@@ -2207,6 +2223,16 @@ body {
 .snapkit-filter__button {
   position: relative;
   flex: none;
+}
+
+/* The trigger lives inside .select-menu so the DS menu can anchor to it, which
+   also drags in `.select-menu .icon` — a rule meant for the icon that precedes
+   a select's label, so it shifts the glyph 8px left and 2px up and fades it to
+   30%. Inside a 32px icon button that reads as a misaligned, greyed-out icon;
+   undo it so the glyph is centred and as solid as the align icons. */
+.snapkit-filter__button .icon {
+  margin: 0;
+  opacity: 1;
 }
 
 .snapkit-filter__dot {

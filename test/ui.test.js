@@ -371,6 +371,17 @@ test('the search field keeps the icon-button grey fill at rest and on focus', fu
   assert.ok(rest && /background-color: var\(--hover-fill\)/.test(rest),
     'the field should always carry the hover fill, the same grey as an icon button: ' + rest);
   assert.ok(/--hover-fill: rgba\(0, 0, 0, \.06\)/.test(HTML), 'the hover fill token should be a light grey');
+  // Two greys side by side on the same row make a height mismatch obvious.
+  var box = cssRule('.input__field');
+  assert.ok(box && /height: var\(--size-medium\)/.test(box) && /margin: 0/.test(box),
+    'the grey field should be as tall as the icon button beside it: ' + box);
+});
+
+test('the filter trigger keeps its glyph centred and solid', function() {
+  var rule = cssRule('.snapkit-filter__button .icon');
+  assert.ok(rule && /margin: 0/.test(rule) && /opacity: 1/.test(rule),
+    'the DS `.select-menu .icon` rule offsets and fades the glyph inside the ' +
+    'icon button; SnapKit has to undo it: ' + rule);
 });
 
 test('the icon buttons carry the grey fill at rest, not only on hover', function() {
@@ -397,10 +408,13 @@ test('the section titles share a left edge with the buttons below them', functio
 });
 
 test('the selected radio dot sits centred in its circle', function() {
-  var rule = cssRule('.radio__label:before');
-  assert.ok(rule && /box-sizing: content-box/.test(rule),
-    'the circle needs content-box sizing for the DS dot offsets to centre: ' + rule);
-  assert.ok(/margin-top: 0/.test(rule), 'the DS baseline nudge tips the circle off its label: ' + rule);
+  var dot = cssRule('.radio__button:checked + .radio__label:before');
+  assert.ok(dot && /background-position: center/.test(dot),
+    'the DS pins the dot at a hard-coded 2px 2px, which is off centre once the ' +
+    'border eats into the 10px circle — centre it instead: ' + dot);
+  var circle = cssRule('.radio__label:before');
+  assert.ok(circle && /margin-top: 0/.test(circle),
+    'the DS baseline nudge tips the circle off its label: ' + circle);
 });
 
 test('the cleanup button reads Delete absolute', function() {
