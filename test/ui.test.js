@@ -1,7 +1,8 @@
-// SnapKit UI tests. The plugin UI is a single HTML string inside code.js, so
-// this extracts it, runs its inline <script> against a tiny DOM stub, and
-// asserts the wiring: the element-type filter popover, the visibility radio
-// group, the loader overlay and the context-aware button states.
+// SnapKit UI tests. The panel is built from ui/index.html + ui/snapkit.css +
+// ui/snapkit.js into ui.html (see scripts/build-ui.js), so this reads the built
+// file, runs its inline <script> against a tiny DOM stub, and asserts the
+// wiring: the element-type filter menu, the visibility radio group, the loader
+// overlay and the context-aware button states.
 // No dependencies — run with: node test/ui.test.js
 
 'use strict';
@@ -11,16 +12,29 @@ var vm = require('vm');
 var path = require('path');
 var assert = require('assert');
 
-var CODE = fs.readFileSync(path.join(__dirname, '..', 'code.js'), 'utf8');
+var buildUi = require('../scripts/build-ui.js');
 
-// --- extract the UI html and its inline script -------------------------------
+var UI_FILE = path.join(__dirname, '..', 'ui.html');
+var HTML = fs.readFileSync(UI_FILE, 'utf8');
+
+// --- extract the inline script ----------------------------------------------
 function extractUi() {
-  var match = CODE.match(/^var uiHtml = '([\s\S]*?)';$/m);
-  assert.ok(match, 'could not find the uiHtml string in code.js');
-  var html = match[1].replace(/<\\\//g, '</'); // un-escape <\/script>
-  var script = html.match(/<script>([\s\S]*)<\/script>/);
-  assert.ok(script, 'could not find the inline UI script');
-  return { html: html, script: script[1] };
+  var script = HTML.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(script, 'could not find the inline UI script in ui.html');
+  return { html: HTML, script: script[1] };
+}
+
+// The SnapKit styles, without the 2000 vendored design-system rules in front.
+function snapkitCss() {
+  var marked = HTML.split('/* snapkit.css */');
+  assert.strictEqual(marked.length, 2, 'expected the snapkit.css block in ui.html');
+  return marked[1].split('</style>')[0];
+}
+
+function cssRule(selector) {
+  var escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  var match = snapkitCss().match(new RegExp('(^|\\n)' + escaped + ' \\{([^}]*)\\}'));
+  return match ? match[2] : null;
 }
 
 // --- minimal DOM stub -------------------------------------------------------
@@ -61,7 +75,7 @@ function makeElement(id, attrs) {
   return el;
 }
 
-// Parse the ids and the popover options out of the html so the stub mirrors it.
+// Parse the ids and the type-filter options out of the html so the stub mirrors it.
 function makeDom(html) {
   var elements = {};
   var idRe = /<(\w+)\b([^>]*)\bid="([^"]+)"([^>]*)>/g;
@@ -75,14 +89,14 @@ function makeDom(html) {
     elements[tag[3]] = makeElement(tag[3], attrs);
   }
 
-  // The popover options have no ids — collect them by data-type, in order.
+  // The menu items have no ids — collect them by data-type, in order.
   var options = [];
-  var optRe = /<button class="([^"]*popover-option[^"]*)" data-type="([^"]+)"/g;
+  var optRe = /<div class="([^"]*select-menu__item[^"]*)" data-type="([^"]+)"/g;
   var o;
   while ((o = optRe.exec(html)) !== null) {
     options.push(makeElement('option-' + o[2], { 'class': o[1], 'data-type': o[2] }));
   }
-  assert.ok(options.length > 0, 'expected popover options in the html');
+  assert.ok(options.length > 0, 'expected type-filter menu items in the html');
 
   var body = makeElement('body', {});
   var dom = {
@@ -95,7 +109,7 @@ function makeDom(html) {
     _options: options
   };
   elements.filterPopover.querySelectorAll = function(selector) {
-    return selector === '.popover-option' ? options : [];
+    return selector === '.select-menu__item' ? options : [];
   };
   return dom;
 }
@@ -113,7 +127,7 @@ function loadUi() {
     console: console
   };
   vm.createContext(ctx);
-  vm.runInContext(ui.script, ctx, { filename: 'uiHtml' });
+  vm.runInContext(ui.script, ctx, { filename: 'ui.html' });
 
   // Fire onclick the way a browser would: the element, then bubble to body.
   function click(el) {
@@ -128,7 +142,7 @@ function loadUi() {
     el: function(id) { return dom._elements[id]; },
     option: function(type) {
       var found = dom._options.filter(function(o) { return o.getAttribute('data-type') === type; })[0];
-      assert.ok(found, 'no popover option for data-type=' + type);
+      assert.ok(found, 'no menu item for data-type=' + type);
       return found;
     },
     options: dom._options,
@@ -163,7 +177,7 @@ test('the UI script loads and asks for the current selection on startup', functi
   assert.deepStrictEqual(ui.lastPosted(), { type: 'check-selection' });
 });
 
-test('the filter popover offers exactly the three known element types', function() {
+test('the filter menu offers exactly the three known element types', function() {
   var ui = loadUi();
   var types = ui.options.map(function(o) { return o.getAttribute('data-type'); });
   assert.deepStrictEqual(types, ['all', 'component', 'non-component']);
@@ -171,43 +185,43 @@ test('the filter popover offers exactly the three known element types', function
 
 test('All types is preselected and the filter icon shows no active dot', function() {
   var ui = loadUi();
-  assert.ok(ui.option('all').classList.contains('selected'), 'All types should start selected');
-  assert.ok(!ui.option('component').classList.contains('selected'));
-  assert.ok(!ui.el('filterBtn').classList.contains('active'), 'no dot while the default filter is on');
+  assert.ok(ui.option('all').classList.contains('select-menu__item--selected'), 'All types should start selected');
+  assert.ok(!ui.option('component').classList.contains('select-menu__item--selected'));
+  assert.ok(!ui.el('filterBtn').classList.contains('is-active'), 'no dot while the default filter is on');
 });
 
-test('clicking the filter icon opens the popover, clicking it again closes it', function() {
+test('clicking the filter icon opens the menu, clicking it again closes it', function() {
   var ui = loadUi();
   ui.click(ui.el('filterBtn'));
-  assert.ok(ui.el('filterPopover').classList.contains('show'), 'popover should open');
+  assert.ok(ui.el('filterPopover').classList.contains('select-menu__menu--active'), 'menu should open');
   ui.click(ui.el('filterBtn'));
-  assert.ok(!ui.el('filterPopover').classList.contains('show'), 'popover should close again');
+  assert.ok(!ui.el('filterPopover').classList.contains('select-menu__menu--active'), 'menu should close again');
 });
 
-test('clicking anywhere else closes the popover', function() {
+test('clicking anywhere else closes the menu', function() {
   var ui = loadUi();
   ui.click(ui.el('filterBtn'));
   ui.click(ui.el('duplicateBtn'));
-  assert.ok(!ui.el('filterPopover').classList.contains('show'), 'a click outside should close the popover');
+  assert.ok(!ui.el('filterPopover').classList.contains('select-menu__menu--active'), 'a click outside should close the menu');
 });
 
-test('choosing a type marks it, flags the icon and closes the popover', function() {
+test('choosing a type marks it, flags the icon and closes the menu', function() {
   var ui = loadUi();
   ui.click(ui.el('filterBtn'));
   ui.click(ui.option('component'));
-  assert.ok(ui.option('component').classList.contains('selected'), 'chosen option should be marked');
-  assert.ok(!ui.option('all').classList.contains('selected'), 'the previous option should be unmarked');
-  assert.ok(ui.el('filterBtn').classList.contains('active'), 'the icon should show the active dot');
-  assert.ok(!ui.el('filterPopover').classList.contains('show'), 'choosing should close the popover');
+  assert.ok(ui.option('component').classList.contains('select-menu__item--selected'), 'chosen option should be marked');
+  assert.ok(!ui.option('all').classList.contains('select-menu__item--selected'), 'the previous option should be unmarked');
+  assert.ok(ui.el('filterBtn').classList.contains('is-active'), 'the icon should show the active dot');
+  assert.ok(!ui.el('filterPopover').classList.contains('select-menu__menu--active'), 'choosing should close the menu');
   assert.ok(/components only/.test(ui.el('filterBtn').title), 'the tooltip should name the filter: ' + ui.el('filterBtn').title);
 });
 
 test('going back to All types clears the active dot', function() {
   var ui = loadUi();
   ui.click(ui.option('non-component'));
-  assert.ok(ui.el('filterBtn').classList.contains('active'));
+  assert.ok(ui.el('filterBtn').classList.contains('is-active'));
   ui.click(ui.option('all'));
-  assert.ok(!ui.el('filterBtn').classList.contains('active'), 'the dot should clear on the default filter');
+  assert.ok(!ui.el('filterBtn').classList.contains('is-active'), 'the dot should clear on the default filter');
 });
 
 test('Select sends the name and the active type filter', function() {
@@ -223,8 +237,6 @@ test('Select sends the name and the active type filter', function() {
 
 test('the visibility radios are Visible / Hidden / All, with All preselected', function() {
   var ui = loadUi();
-  var row = ui.html.match(/<div class="radio-row" id="visibilityRow">([\s\S]*?)<\/div>(?!<\/label>)/);
-  assert.ok(row, 'expected a visibility radio row in the html');
   var labels = ui.html.match(/data-visibility="(\w+)"/g).map(function(m) { return m.split('"')[1]; });
   assert.deepStrictEqual(labels, ['visible', 'hidden', 'all']);
   assert.strictEqual(ui.el('visAll').checked, true, 'All should start selected');
@@ -235,8 +247,9 @@ test('the visibility radios are Visible / Hidden / All, with All preselected', f
 test('the three visibility radios sit on one line under a Select title', function() {
   var ui = loadUi();
   assert.ok(/<div class="section-title">Select<\/div>/.test(ui.html), 'expected a Select section title');
-  var rule = ui.html.match(/\.radio-row \{([^}]*)\}/);
-  assert.ok(rule && /display: flex/.test(rule[1]), 'the radio row should be a single flex line: ' + (rule && rule[1]));
+  var rule = cssRule('.snapkit-radios');
+  assert.ok(rule && /display: flex/.test(rule), 'the radio row should be a single flex line: ' + rule);
+  assert.ok(/class="radio__button"/.test(ui.html), 'the radios should use the design system radio');
 });
 
 test('the Actions title comes before the absolute / fixed scroll line', function() {
@@ -244,7 +257,7 @@ test('the Actions title comes before the absolute / fixed scroll line', function
   var actions = ui.html.indexOf('<div class="section-title">Actions</div>');
   assert.ok(actions !== -1, 'expected an Actions section title');
   assert.ok(actions < ui.html.indexOf('id="absoluteBtn"'), 'Actions should come before Set to absolute');
-  var line = ui.html.slice(actions).match(/<div class="button-group">([\s\S]*?)<\/div>/);
+  var line = ui.html.slice(actions).match(/<div class="snapkit-grid snapkit-grid--2">([\s\S]*?)<\/div>/);
   assert.ok(line && /absoluteBtn/.test(line[1]) && /fixedScrollBtn/.test(line[1]),
     'Set to absolute and Set fixed scroll should share one row: ' + (line && line[1]));
 });
@@ -297,19 +310,20 @@ test('Select with an empty name shows an error instead of searching', function()
   ui.click(ui.el('selectBtn'));
   assert.strictEqual(ui.posted.length, before, 'nothing should be posted for an empty name');
   assert.ok(/enter a component name/i.test(ui.el('message').textContent), 'expected an error message');
+  assert.ok(/snapkit-toast--error/.test(ui.el('message').className), 'errors should use the error toast: ' + ui.el('message').className);
 });
 
 test('the loader overlay shows during a search and hides on the result', function() {
   var ui = loadUi();
   ui.el('frameName').value = 'Card';
   ui.click(ui.el('selectBtn'));
-  assert.ok(ui.el('overlay').classList.contains('show'), 'overlay should show while searching');
+  assert.ok(ui.el('overlay').classList.contains('is-visible'), 'overlay should show while searching');
   ui.send({ type: 'success', text: 'Found and selected 2 element(s)' });
-  assert.ok(!ui.el('overlay').classList.contains('show'), 'overlay should hide on success');
+  assert.ok(!ui.el('overlay').classList.contains('is-visible'), 'overlay should hide on success');
 
   ui.click(ui.el('selectBtn'));
   ui.send({ type: 'error', text: 'No elements found' });
-  assert.ok(!ui.el('overlay').classList.contains('show'), 'overlay should hide on error too');
+  assert.ok(!ui.el('overlay').classList.contains('is-visible'), 'overlay should hide on error too');
 });
 
 test('the loader spells out what is being searched: name, type filter and scope', function() {
@@ -344,36 +358,60 @@ test('Select absolute says absolute, and empty name reads as any name', function
 });
 
 test('the active-filter dot is red and bigger than the old green one', function() {
+  var rule = cssRule('.snapkit-filter__dot');
+  assert.ok(rule, 'expected a .snapkit-filter__dot rule in the SnapKit css');
+  assert.ok(/background-color: var\(--red\)/.test(rule), 'the dot should use the design system red: ' + rule);
+  assert.ok(/--red: #f24822/.test(HTML), 'the design system red should be a red');
+  var size = rule.match(/width: (\d+)px/);
+  assert.ok(size && Number(size[1]) >= 10, 'the dot should be at least 10px wide: ' + rule);
+});
+
+test('the cleanup button reads Delete absolute', function() {
   var ui = loadUi();
-  var rule = ui.html.match(/\.icon-btn \.dot \{([^}]*)\}/);
-  assert.ok(rule, 'expected an .icon-btn .dot rule in the UI css');
-  assert.ok(/background: #DC2626/.test(rule[1]), 'the dot should be red: ' + rule[1]);
-  var size = rule[1].match(/width: (\d+)px/);
-  assert.ok(size && Number(size[1]) >= 10, 'the dot should be at least 10px wide: ' + rule[1]);
+  assert.ok(/<button id="deleteAbsBtn"[^>]*>Delete absolute<\/button>/.test(ui.html),
+    'the absolute cleanup button should be labelled Delete absolute');
+  assert.ok(!/Remove absolute/.test(ui.html), 'no Remove absolute copy should be left in the panel');
+  ui.click(ui.el('deleteAbsBtn'));
+  assert.deepStrictEqual(ui.lastPosted(), { type: 'remove-absolute' });
 });
 
 test('selection-change disables Set to absolute for an already-absolute selection', function() {
   var ui = loadUi();
   ui.send({ type: 'selection-change', hasSelection: true, hasAbsolute: true, hasNonAbsolute: false, hasContainer: false });
   assert.ok(ui.el('absoluteBtn').disabled, 'Set to absolute should be disabled');
-  assert.ok(!ui.el('removeAbsBtn').disabled, 'Remove absolute should stay available');
+  assert.ok(!ui.el('deleteAbsBtn').disabled, 'Delete absolute should stay available');
   assert.ok(!ui.el('duplicateBtn').disabled, 'Duplicate should be enabled with a selection');
 });
 
-test('selection-change with nothing selected keeps Remove absolute available', function() {
+test('selection-change with nothing selected keeps Delete absolute available', function() {
   var ui = loadUi();
   ui.send({ type: 'selection-change', hasSelection: false, hasAbsolute: false, hasNonAbsolute: false, hasContainer: false });
-  assert.ok(!ui.el('removeAbsBtn').disabled, 'Remove absolute works page-wide with no selection');
+  assert.ok(!ui.el('deleteAbsBtn').disabled, 'Delete absolute works page-wide with no selection');
   assert.ok(ui.el('duplicateBtn').disabled, 'Duplicate needs a selection');
   assert.ok(ui.el('deleteBtn').disabled, 'Delete needs a selection');
 });
 
-test('the UI string stays parseable: single-quoted, with an escaped script tag', function() {
-  var line = CODE.split('\n').filter(function(l) { return /^var uiHtml = /.test(l); });
-  assert.strictEqual(line.length, 1, 'uiHtml must stay on one line');
-  var inner = line[0].slice('var uiHtml = '.length + 1, -2);
-  assert.strictEqual(inner.indexOf("'"), -1, 'no single quotes allowed inside the uiHtml string');
-  assert.ok(/<\\\/script>/.test(line[0]), 'the closing script tag must stay escaped as <\\/script>');
+test('the panel is built on the vendored figma-plugin-ds', function() {
+  var ui = loadUi();
+  ['button button--primary', 'button--secondary', 'input__field', 'radio__button',
+   'select-menu__menu', 'icon icon--search', 'icon--align-left', 'section-title'
+  ].forEach(function(cls) {
+    assert.ok(ui.html.indexOf('"' + cls) !== -1 || ui.html.indexOf(cls + '"') !== -1 || ui.html.indexOf(cls + ' ') !== -1,
+      'expected the design system class "' + cls + '" in the panel');
+  });
+  assert.ok(/--blue: #18a0fb/.test(ui.html), 'expected the design system tokens to be inlined');
+});
+
+test('the built panel pulls nothing from the network', function() {
+  assert.ok(!/<link\b/.test(HTML), 'ui.html must not link an external stylesheet');
+  assert.ok(!/<script[^>]+src=/.test(HTML), 'ui.html must not load an external script');
+  assert.ok(!/url\(\s*["']?https?:/i.test(HTML), 'ui.html must not fetch remote assets (fonts, images)');
+  assert.ok(!/rsms\.me/.test(HTML), 'the remote Inter webfont should be stripped at build time');
+});
+
+test('ui.html is in sync with the sources in ui/', function() {
+  assert.strictEqual(HTML, buildUi.build(),
+    'ui.html is stale — run: npm run build:ui');
 });
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

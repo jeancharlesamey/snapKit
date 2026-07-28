@@ -12,10 +12,14 @@ var mock = require('./figma-mock');
 
 var CODE = fs.readFileSync(path.join(__dirname, '..', 'code.js'), 'utf8');
 
+// Figma injects the manifest's `ui` file as the __html__ global; ui.html is
+// built from ui/ by scripts/build-ui.js.
+var UI_HTML = fs.readFileSync(path.join(__dirname, '..', 'ui.html'), 'utf8');
+
 // Load a fresh copy of the plugin bound to the given figma global, then return
 // it so the test can drive figma._send(...) and inspect figma._messages.
 function loadPlugin(figma) {
-  var ctx = { figma: figma, console: console };
+  var ctx = { figma: figma, console: console, __html__: UI_HTML };
   vm.createContext(ctx);
   vm.runInContext(CODE, ctx, { filename: 'code.js' });
   return figma;

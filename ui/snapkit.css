@@ -1,0 +1,255 @@
+/* SnapKit — the thin layer on top of figma-plugin-ds.
+ *
+ * Everything that looks like a Figma control (buttons, input, radios, the type
+ * menu, the icons) comes from the vendored design system. This file only does
+ * three things: layout, a couple of button/icon-button resets the DS does not
+ * ship, and the two components the DS has no equivalent for — the toast and the
+ * search overlay. Anything added here should use the DS tokens, never raw
+ * colours or font sizes.
+ */
+
+:root {
+  /* The DS asks for Inter from a remote host; the build strips that @font-face,
+     so fall back through the local stack. Figma itself ships Inter, so most
+     users already have it. */
+  --font-stack: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* The DS sizes its controls with `height` and adds borders on top, and only
+   sets box-sizing on <body>. Without this reset a full-width .button overflows
+   its grid cell by its 2px border. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-stack);
+  padding: var(--size-xxsmall);
+  background-color: var(--white);
+}
+
+/* --- layout --------------------------------------------------------------- */
+
+.snapkit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-xxxsmall);
+}
+
+.snapkit-row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-xxxsmall);
+}
+
+.snapkit-row__grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.snapkit-grid {
+  display: grid;
+  gap: var(--size-xxxsmall);
+}
+
+.snapkit-grid--2 { grid-template-columns: 1fr 1fr; }
+.snapkit-grid--3 { grid-template-columns: repeat(3, 1fr); }
+
+/* DS buttons hug their label; in a grid or on their own line they should fill
+   the row and centre the label. */
+.snapkit-block,
+.snapkit-grid .button {
+  width: 100%;
+  justify-content: center;
+}
+
+.snapkit-grid .icon-button {
+  width: 100%;
+}
+
+/* --- button / icon-button resets ------------------------------------------ */
+
+/* The DS styles .icon-button assuming a <div>. SnapKit uses real <button>
+   elements so they can be disabled, which needs the UA styling cleared. */
+.icon-button {
+  background-color: transparent;
+  padding: 0;
+  outline: none;
+}
+
+.icon-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.icon-button:disabled:hover {
+  background: transparent;
+}
+
+.button {
+  cursor: pointer;
+}
+
+.button:disabled {
+  cursor: default;
+}
+
+/* "Set fixed scroll" reads as disabled but stays clickable, so pressing it can
+   explain why the Figma API cannot do it yet. */
+.button.snapkit-is-disabled {
+  border-color: var(--black3);
+  color: var(--black3);
+  cursor: default;
+}
+
+/* --- visibility radios ---------------------------------------------------- */
+
+.snapkit-radios {
+  display: flex;
+  align-items: center;
+}
+
+.snapkit-radios .radio {
+  flex: 1 1 0;
+}
+
+/* The DS reserves 16px after every label; three radios on one 320px line
+   cannot afford it. */
+.snapkit-radios .radio__label {
+  padding-right: 0;
+}
+
+/* --- element type filter -------------------------------------------------- */
+
+.snapkit-filter {
+  flex: 0 0 var(--size-medium);
+}
+
+.snapkit-filter__button {
+  position: relative;
+  flex: none;
+}
+
+.snapkit-filter__dot {
+  display: none;
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background-color: var(--red);
+  border: 2px solid var(--white);
+  /* .icon-button * paints its children black — the dot has to opt out. */
+  filter: none;
+}
+
+.snapkit-filter__button.is-active .snapkit-filter__dot {
+  display: block;
+}
+
+/* The DS menu is as wide as its trigger; the trigger here is a 32px icon. */
+.snapkit-filter__menu {
+  top: calc(var(--size-medium) + 2px);
+  left: auto;
+  right: 0;
+  width: 212px;
+}
+
+.snapkit-filter__item {
+  cursor: default;
+}
+
+/* --- toast ---------------------------------------------------------------- */
+
+.snapkit-toast {
+  display: none;
+  position: fixed;
+  top: var(--size-xxsmall);
+  left: var(--size-xxsmall);
+  right: var(--size-xxsmall);
+  z-index: 9999;
+  padding: var(--size-xxsmall);
+  border-radius: var(--border-radius-small);
+  box-shadow: var(--shadow-hud);
+  background-color: var(--hud);
+  color: var(--white);
+  font-family: var(--font-stack);
+  font-size: var(--font-size-xsmall);
+  line-height: var(--font-line-height);
+}
+
+.snapkit-toast--error {
+  background-color: var(--red);
+}
+
+.snapkit-toast.is-visible {
+  display: block;
+}
+
+/* --- search overlay ------------------------------------------------------- */
+
+.snapkit-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--size-xsmall);
+  padding: var(--size-small);
+  text-align: center;
+  background-color: var(--white8);
+}
+
+.snapkit-overlay.is-visible {
+  display: flex;
+}
+
+.snapkit-overlay__context {
+  max-width: 262px;
+  color: var(--black8);
+}
+
+.snapkit-overlay__msgs {
+  position: relative;
+  width: 200px;
+  height: var(--size-large);
+}
+
+.snapkit-overlay__msg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  color: var(--black8);
+}
+
+/* The messages take turns while a long search runs, then the last one and the
+   escape hatch stay on screen. */
+.snapkit-overlay.is-visible .m1 { animation: snapkitMsgCycle 3s ease forwards; }
+.snapkit-overlay.is-visible .m2 { animation: snapkitMsgCycle 5s ease forwards 3s; }
+.snapkit-overlay.is-visible .m3 { animation: snapkitMsgCycle 4s ease forwards 8s; }
+.snapkit-overlay.is-visible .m4 { animation: snapkitMsgCycle 5s ease forwards 12s; }
+.snapkit-overlay.is-visible .m5 { animation: snapkitMsgFadeIn 0.5s ease forwards 17s; }
+.snapkit-overlay.is-visible .snapkit-overlay__stop { animation: snapkitMsgFadeIn 0.5s ease forwards 17s; }
+
+@keyframes snapkitMsgCycle {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes snapkitMsgFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.snapkit-overlay__stop {
+  opacity: 0;
+}

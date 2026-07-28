@@ -14,24 +14,26 @@ A Figma plugin for finding elements fast and putting them where they belong — 
 
 ## THE PANEL
 
+SnapKit is built with [figma-plugin-ds](https://github.com/thomas-lowry/figma-plugin-ds), so every control — buttons, the search field, the radios, the type menu, the icons — is the one Figma uses itself. The library is vendored in the repo (see [Development](#development)); nothing is fetched from the network.
+
 The panel is split into two titled sections so searching never gets mixed up with changing the document:
 
 ```
 SELECT
-  [ Name(s) comma separated, * as wildcard...  ] [=]   ← filter icon (element type)
-  ( ) Visible      ( ) Hidden      (o) All             ← visibility, one line
+  [ 🔍 Name(s) comma separated, * as wildcard... ] [⚙]  ← filter icon (element type)
+  ( ) Visible      ( ) Hidden      (o) All              ← visibility, one line
   [ Select ]                       [ Select absolute ]
 
 ACTIONS
   [ Set to absolute ]              [ Set fixed scroll ]
   [ Duplicate selected ]
-  [ Remove absolute ]
+  [ Delete absolute ]
   [ Delete selected ]
-  [ ← ] [ ↔ ] [ → ]                                    ← align horizontally
-  [ ↑ ] [ ↕ ] [ ↓ ]                                    ← align vertically
+  [ ← ] [ ↔ ] [ → ]                                     ← align horizontally
+  [ ↑ ] [ ↕ ] [ ↓ ]                                     ← align vertically
 ```
 
-Everything under **Select** only reads the file. Everything under **Actions** modifies it.
+Everything under **Select** only reads the file. Everything under **Actions** modifies it — the two destructive ones, *Delete absolute* and *Delete selected*, are the red buttons.
 
 
 ## SELECT
@@ -51,7 +53,7 @@ Type one or more names in the field and press **Select**. Names are comma separa
 **Select absolute** runs the same search but keeps only absolute-positioned elements. Unlike **Select**, it accepts an **empty name field** — that means "every absolute element in scope", which is the quickest way to audit the sticky headers and fixed navigation in a prototype.
 
 ### Element type filter
-The **filter icon** next to the name field opens a small popover with three choices:
+The **filter icon** next to the name field opens a small menu — the dark HUD menu Figma uses for its own dropdowns — with three choices:
 
 - **All types** (default)
 - **Components only** — components, variant sets and instances
@@ -101,13 +103,13 @@ Six buttons, two rows — **Left / Center / Right**, then **Top / Middle / Botto
 **Shift-click** an alignment button with an *absolute autolayout frame* selected to change its internal alignment instead of moving it.
 
 ### Cleanup
-- **Remove absolute** — works three ways depending on the selection:
-  - absolute elements selected → removes those
-  - frames or sections selected → removes the absolute elements inside them
-  - nothing selected → removes every absolute element on the page
+- **Delete absolute** — deletes the absolute-positioned elements themselves (not just their positioning), three ways depending on the selection:
+  - absolute elements selected → deletes those
+  - frames or sections selected → deletes the absolute elements inside them
+  - nothing selected → deletes every absolute element on the page
 - **Delete selected** — deletes the current selection.
 
-Buttons enable and disable themselves as your selection changes: *Set to absolute* greys out when the selection is already absolute, *Remove absolute* greys out when there is nothing absolute to remove but stays available with nothing selected (whole-page mode).
+Buttons enable and disable themselves as your selection changes: *Set to absolute* greys out when the selection is already absolute, *Delete absolute* greys out when there is nothing absolute to delete but stays available with nothing selected (whole-page mode).
 
 
 ## RECIPES
@@ -137,7 +139,7 @@ Buttons enable and disable themselves as your selection changes: *Set to absolut
 
 **Bulk cleanup**
 1. Select the frames to clean, or nothing for the whole page
-2. **Remove absolute**
+2. **Delete absolute**
 
 
 ## TIPS
@@ -146,21 +148,54 @@ Buttons enable and disable themselves as your selection changes: *Set to absolut
 - **Filters are sticky** — the red dot on the filter icon and the highlighted radio are the reminders that a search is narrowed
 - **Read the loader** — if a search returns something unexpected, the line under the spinner says exactly what SnapKit looked for
 - **Empty name is a feature** — with *Select absolute* or a *Hidden* search it means "everything in scope"
-- **Sections are supported** — searches and *Remove absolute* both walk into sections
+- **Sections are supported** — searches and *Delete absolute* both walk into sections
 
 
 ## DEVELOPMENT
 
+### Layout
+
+```
+code.js                                    the Figma main thread
+manifest.json                              points at code.js and ui.html
+ui.html                                    GENERATED — do not edit
+scripts/build-ui.js                        builds ui.html from ui/
+ui/
+  index.html                               the panel markup
+  snapkit.css                              layout + the few DS overrides
+  snapkit.js                               the panel behaviour
+  vendor/figma-plugin-ds/                  the design system, vendored (MIT)
+test/                                      the test suite
+```
+
+### The design system
+
+The UI uses **[figma-plugin-ds](https://github.com/thomas-lowry/figma-plugin-ds)** by Tom Lowry, a CSS library that reproduces Figma's own controls. Its stylesheet is **copied into `ui/vendor/figma-plugin-ds/`** rather than installed: SnapKit has no `npm install` step, and a plugin iframe cannot resolve a remote or relative stylesheet anyway. `ui/vendor/figma-plugin-ds/README.md` records the version and how to update it — drop in the new file, run `npm run build:ui`.
+
+`ui/snapkit.css` is deliberately thin: layout, two `<button>` resets the DS does not ship, and the toast and search overlay it has no equivalent for. New controls should reach for a DS class first.
+
+### The build step
+
+Figma serves the plugin UI from a sandboxed iframe with no document base, so `ui.html` has to be one self-contained file. `scripts/build-ui.js` inlines the stylesheets and the script from `ui/`, and strips the design system's remote Inter `@font-face` rules so the panel never touches the network.
+
+```
+npm run build:ui
+```
+
+`ui.html` is committed so the plugin can be imported straight from the manifest. `npm test` fails if it is out of date.
+
+### Tests
+
 The plugin runs inside Figma, but its logic is covered by a dependency-free test suite that mocks the Figma plugin API:
 
-- `test/plugin.test.js` — every UI message handler (select, select absolute, duplicate, set to absolute, align, remove absolute, delete), including the type and visibility filters
-- `test/ui.test.js` — extracts the UI html from `code.js` and runs its inline script against a small DOM stub, covering the filter popover, the visibility radio group, the Select / Actions sections, the loader overlay and its search-context line, and the context-aware button states
+- `test/plugin.test.js` — every UI message handler (select, select absolute, duplicate, set to absolute, align, delete absolute, delete), including the type and visibility filters
+- `test/ui.test.js` — reads the built `ui.html` and runs its inline script against a small DOM stub, covering the type filter menu, the visibility radio group, the Select / Actions sections, the loader overlay and its search-context line, the context-aware button states, and that nothing in the panel is loaded from the network
 
 ```
 npm test
 ```
 
-No `npm install` needed — the tests only use Node built-ins.
+No `npm install` needed — everything uses Node built-ins only.
 
 Version numbers live in `README.md` (title, release notes, footer), `package.json`, the header comment of `code.js`, and the `name` field of `manifest.json`. The manifest `id` is deliberately left alone: Figma treats it as the plugin's identity.
 
@@ -172,11 +207,15 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 - Visibility filter (issue #5, part 3): a Visible / Hidden / All radio group on one line under the name field narrows any search to what is shown or what is hidden. *Hidden* means the layer's own visibility is off — opacity 0 and hidden parents are explicitly not counted. It applies to both Select and Select absolute, combines with the name and type filters, and an empty name field means "everything hidden in scope".
 
 **UI Changes:**
-- The panel is now grouped under two titles: **Select** (name field, type filter, visibility radios, Select / Select absolute) and **Actions** (Set to absolute, Set fixed scroll, Duplicate, Remove absolute, Delete, alignment grid), so reading the file and changing it are visually separated
+- The whole panel is rebuilt on **[figma-plugin-ds](https://github.com/thomas-lowry/figma-plugin-ds)**, so SnapKit now looks like the rest of Figma: native button styles (primary / secondary / destructive), the Figma search field, the Figma radio group, the dark HUD menu for the element type filter, and the real Figma icons for search, filter, spinner and the six alignments. The library is vendored under `ui/vendor/figma-plugin-ds/` — no npm dependency, no CDN, and its remote Inter webfont is stripped at build time so the panel still touches nothing on the network
+- **"Remove absolute" is now "Delete absolute"** — the button always deleted the elements, so the label now says so, and it is styled as a destructive action. The success message reads "Deleted N absolute element(s)"
+- The UI moved out of the single HTML string in `code.js` into real files under `ui/`, built into `ui.html` by `npm run build:ui` and loaded through the manifest `ui` field. The panel is more compact as a result (320×400 instead of 320×620)
+- The panel is now grouped under two titles: **Select** (name field, type filter, visibility radios, Select / Select absolute) and **Actions** (Set to absolute, Set fixed scroll, Duplicate, Delete absolute, Delete selected, alignment grid), so reading the file and changing it are visually separated
 - The loader search context and the result message both name the active visibility filter
 
 **Documentation:**
 - README rewritten around the two panel sections, with the search filters documented together, a recipes section, and previously undocumented behaviour written down (Shift-click alignment on absolute autolayout frames, the loader's Stop button, where version numbers live)
+- Development section documents the new `ui/` layout, the vendored design system and the `npm run build:ui` step
 
 ### v1.0.2-alpha (July 27, 2026)
 **New Features:**
