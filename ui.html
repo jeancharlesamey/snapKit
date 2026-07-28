@@ -2192,6 +2192,18 @@ body {
   flex: 1 1 0;
 }
 
+/* The DS leaves the (invisible) radio input in the flow, so every circle starts
+   10px in from its row — the same 10px indent that was just taken off the
+   section titles, only now on the radios. Taking the input out of the flow lets
+   the DS's own -16px label margin land the first circle on the panel's left
+   edge, in line with the titles, the field and the buttons. The input keeps its
+   own box for the focus ring, centred on the 32px row. */
+.snapkit-radios .radio__button {
+  position: absolute;
+  top: 11px;
+  left: 0;
+}
+
 /* The DS reserves 16px after every label; three radios on one 320px line
    cannot afford it. */
 .snapkit-radios .radio__label {
