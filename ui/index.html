@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SnapKit</title>
+  <!-- Both stylesheets and the script are inlined into the built ui.html by
+       scripts/build-ui.js — Figma serves the plugin UI from a sandboxed iframe
+       that cannot resolve relative files. Open this file directly in a browser
+       to preview the panel. -->
+  <link rel="stylesheet" href="vendor/figma-plugin-ds/figma-plugin-ds.css">
+  <link rel="stylesheet" href="snapkit.css">
+</head>
+<body>
+  <div class="snapkit">
+    <div id="message" class="snapkit-toast"></div>
+
+    <div class="section-title">Select</div>
+
+    <div class="snapkit-row">
+      <div class="input input--with-icon snapkit-row__grow">
+        <!-- The magnifier comes after the field on purpose: it is absolutely
+             positioned, so DOM order changes nothing visually, but it lets the
+             css hide it once the field has content (there is no
+             previous-sibling selector to pair with :placeholder-shown). -->
+        <input id="frameName" type="text" class="input__field" placeholder="Name(s) comma separated, * as wildcard...">
+        <div class="icon icon--search icon--black3"></div>
+      </div>
+      <div class="select-menu snapkit-filter">
+        <button id="filterBtn" class="icon-button snapkit-filter__button" title="Filter by element type">
+          <div class="icon icon--adjust"></div>
+          <span class="snapkit-filter__dot"></span>
+        </button>
+        <div id="filterPopover" class="select-menu__menu snapkit-filter__menu">
+          <span class="select-menu__divider-label">Element type</span>
+          <div class="select-menu__item select-menu__item--selected snapkit-filter__item" data-type="all">
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">All types</span>
+          </div>
+          <div class="select-menu__item snapkit-filter__item" data-type="component">
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Components only</span>
+          </div>
+          <div class="select-menu__item snapkit-filter__item" data-type="non-component">
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Everything but components</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="snapkit-radios" id="visibilityRow">
+      <div class="radio">
+        <input id="visVisible" class="radio__button" type="radio" name="visibility" data-visibility="visible">
+        <label class="radio__label" for="visVisible">Visible</label>
+      </div>
+      <div class="radio">
+        <input id="visHidden" class="radio__button" type="radio" name="visibility" data-visibility="hidden">
+        <label class="radio__label" for="visHidden">Hidden</label>
+      </div>
+      <div class="radio">
+        <input id="visAll" class="radio__button" type="radio" name="visibility" data-visibility="all" checked>
+        <label class="radio__label" for="visAll">All</label>
+      </div>
+    </div>
+
+    <div class="snapkit-grid snapkit-grid--2">
+      <button id="selectBtn" class="button button--primary">Select</button>
+      <button id="selectAbsoluteBtn" class="button button--secondary">Select absolute</button>
+    </div>
+
+    <div class="section-title">Actions</div>
+
+    <div class="snapkit-grid snapkit-grid--2">
+      <button id="absoluteBtn" class="button button--secondary">Set to absolute</button>
+      <button id="fixedScrollBtn" class="button button--secondary snapkit-is-disabled" title="Not yet possible due to Figma API limitations">Set fixed scroll</button>
+    </div>
+    <button id="duplicateBtn" class="button button--secondary snapkit-block">Duplicate selected</button>
+    <button id="deleteAbsBtn" class="button button--secondary-destructive snapkit-block">Delete absolute</button>
+    <button id="deleteBtn" class="button button--primary-destructive snapkit-block">Delete selected</button>
+
+    <div class="snapkit-grid snapkit-grid--3">
+      <button id="alignLeftBtn" class="icon-button" title="Align left"><div class="icon icon--align-left"></div></button>
+      <button id="alignCenterBtn" class="icon-button" title="Align center"><div class="icon icon--align-horizontal-centers"></div></button>
+      <button id="alignRightBtn" class="icon-button" title="Align right"><div class="icon icon--align-right"></div></button>
+      <button id="alignTopBtn" class="icon-button" title="Align top"><div class="icon icon--align-top"></div></button>
+      <button id="alignMiddleBtn" class="icon-button" title="Align middle"><div class="icon icon--align-vertical-centers"></div></button>
+      <button id="alignBottomBtn" class="icon-button" title="Align bottom"><div class="icon icon--layout-align-bottom"></div></button>
+    </div>
+  </div>
+
+  <div class="snapkit-overlay" id="overlay">
+    <div class="icon icon--spinner icon--spin icon--blue"></div>
+    <div class="snapkit-overlay__context type type--large type--bold" id="overlayContext"></div>
+    <div class="snapkit-overlay__msgs">
+      <span class="snapkit-overlay__msg m1 type type--small">Walking through every layer in scope</span>
+      <span class="snapkit-overlay__msg m2 type type--small">A lot of things to look at</span>
+      <span class="snapkit-overlay__msg m3 type type--small">Still in progress, and you?</span>
+      <span class="snapkit-overlay__msg m4 type type--small">Digging in the last frame</span>
+      <span class="snapkit-overlay__msg m5 type type--small">We are letting you cancel the selection if you think a problem happened</span>
+    </div>
+    <button class="button button--secondary-destructive snapkit-overlay__stop" id="overlayStop">Stop the selection</button>
+  </div>
+
+  <script src="snapkit.js"></script>
+</body>
+</html>
