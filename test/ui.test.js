@@ -1,7 +1,7 @@
 // SnapKit UI tests. The plugin UI is a single HTML string inside code.js, so
 // this extracts it, runs its inline <script> against a tiny DOM stub, and
-// asserts the wiring: the element-type filter popover, the loader overlay and
-// the context-aware button states.
+// asserts the wiring: the element-type filter popover, the visibility radio
+// group, the loader overlay and the context-aware button states.
 // No dependencies — run with: node test/ui.test.js
 
 'use strict';
@@ -214,11 +214,65 @@ test('Select sends the name and the active type filter', function() {
   var ui = loadUi();
   ui.el('frameName').value = ' Card ';
   ui.click(ui.el('selectBtn'));
-  assert.deepStrictEqual(ui.lastPosted(), { type: 'select-frame', name: 'Card', typeFilter: 'all' });
+  assert.deepStrictEqual(ui.lastPosted(), { type: 'select-frame', name: 'Card', typeFilter: 'all', visibility: 'all' });
 
   ui.click(ui.option('component'));
   ui.click(ui.el('selectBtn'));
-  assert.deepStrictEqual(ui.lastPosted(), { type: 'select-frame', name: 'Card', typeFilter: 'component' });
+  assert.deepStrictEqual(ui.lastPosted(), { type: 'select-frame', name: 'Card', typeFilter: 'component', visibility: 'all' });
+});
+
+test('the visibility radios are Visible / Hidden / All, with All preselected', function() {
+  var ui = loadUi();
+  var row = ui.html.match(/<div class="radio-row" id="visibilityRow">([\s\S]*?)<\/div>(?!<\/label>)/);
+  assert.ok(row, 'expected a visibility radio row in the html');
+  var labels = ui.html.match(/data-visibility="(\w+)"/g).map(function(m) { return m.split('"')[1]; });
+  assert.deepStrictEqual(labels, ['visible', 'hidden', 'all']);
+  assert.strictEqual(ui.el('visAll').checked, true, 'All should start selected');
+  assert.strictEqual(ui.el('visVisible').checked, false);
+  assert.strictEqual(ui.el('visHidden').checked, false);
+});
+
+test('the three visibility radios sit on one line under a Select title', function() {
+  var ui = loadUi();
+  assert.ok(/<div class="section-title">Select<\/div>/.test(ui.html), 'expected a Select section title');
+  var rule = ui.html.match(/\.radio-row \{([^}]*)\}/);
+  assert.ok(rule && /display: flex/.test(rule[1]), 'the radio row should be a single flex line: ' + (rule && rule[1]));
+});
+
+test('the Actions title comes before the absolute / fixed scroll line', function() {
+  var ui = loadUi();
+  var actions = ui.html.indexOf('<div class="section-title">Actions</div>');
+  assert.ok(actions !== -1, 'expected an Actions section title');
+  assert.ok(actions < ui.html.indexOf('id="absoluteBtn"'), 'Actions should come before Set to absolute');
+  var line = ui.html.slice(actions).match(/<div class="button-group">([\s\S]*?)<\/div>/);
+  assert.ok(line && /absoluteBtn/.test(line[1]) && /fixedScrollBtn/.test(line[1]),
+    'Set to absolute and Set fixed scroll should share one row: ' + (line && line[1]));
+});
+
+test('picking a visibility radio sends it and unchecks the others', function() {
+  var ui = loadUi();
+  ui.el('frameName').value = 'Card';
+  ui.click(ui.el('visHidden'));
+  assert.strictEqual(ui.el('visHidden').checked, true);
+  assert.strictEqual(ui.el('visAll').checked, false, 'only one radio stays checked');
+  ui.click(ui.el('selectBtn'));
+  assert.deepStrictEqual(ui.lastPosted(), { type: 'select-frame', name: 'Card', typeFilter: 'all', visibility: 'hidden' });
+
+  ui.click(ui.el('visVisible'));
+  ui.click(ui.el('selectAbsoluteBtn'));
+  assert.deepStrictEqual(ui.lastPosted(), { type: 'select-absolute', name: 'Card', typeFilter: 'all', visibility: 'visible' });
+});
+
+test('the loader context names the chosen visibility', function() {
+  var ui = loadUi();
+  ui.el('frameName').value = 'Card';
+  ui.click(ui.el('selectBtn'));
+  assert.ok(/visible and hidden/.test(ui.el('overlayContext').textContent), 'the default should say both are searched');
+
+  ui.click(ui.el('visHidden'));
+  ui.click(ui.el('selectBtn'));
+  assert.ok(/hidden elements only/.test(ui.el('overlayContext').textContent),
+    'should name the visibility filter: ' + ui.el('overlayContext').textContent);
 });
 
 test('the type filter sticks across searches until it is changed', function() {
@@ -227,14 +281,14 @@ test('the type filter sticks across searches until it is changed', function() {
   ui.click(ui.option('non-component'));
   ui.click(ui.el('selectBtn'));
   ui.click(ui.el('selectBtn'));
-  assert.deepStrictEqual(ui.lastPosted(), { type: 'select-frame', name: 'Card', typeFilter: 'non-component' });
+  assert.deepStrictEqual(ui.lastPosted(), { type: 'select-frame', name: 'Card', typeFilter: 'non-component', visibility: 'all' });
 });
 
 test('Select absolute sends the type filter too, and allows an empty name', function() {
   var ui = loadUi();
   ui.click(ui.option('component'));
   ui.click(ui.el('selectAbsoluteBtn'));
-  assert.deepStrictEqual(ui.lastPosted(), { type: 'select-absolute', name: '', typeFilter: 'component' });
+  assert.deepStrictEqual(ui.lastPosted(), { type: 'select-absolute', name: '', typeFilter: 'component', visibility: 'all' });
 });
 
 test('Select with an empty name shows an error instead of searching', function() {

@@ -24,6 +24,7 @@ function makeNode(spec) {
 
   // Optional properties — only present when the spec asks for them, so that
   // `'prop' in node` matches the real API surface.
+  if ('visible' in spec) node.visible = spec.visible;
   if ('layoutMode' in spec) node.layoutMode = spec.layoutMode;
   if ('layoutPositioning' in spec) node.layoutPositioning = spec.layoutPositioning;
   if ('layoutAlign' in spec) node.layoutAlign = spec.layoutAlign;
