@@ -366,6 +366,43 @@ test('the active-filter dot is red and bigger than the old green one', function(
   assert.ok(size && Number(size[1]) >= 10, 'the dot should be at least 10px wide: ' + rule);
 });
 
+test('the search field keeps the icon-button grey fill at rest and on focus', function() {
+  var rest = cssRule('.input__field:focus');
+  assert.ok(rest && /background-color: var\(--hover-fill\)/.test(rest),
+    'the field should always carry the hover fill, the same grey as an icon button: ' + rest);
+  assert.ok(/--hover-fill: rgba\(0, 0, 0, \.06\)/.test(HTML), 'the hover fill token should be a light grey');
+});
+
+test('the icon buttons carry the grey fill at rest, not only on hover', function() {
+  var rule = cssRule('.icon-button');
+  assert.ok(rule && /background-color: var\(--hover-fill\)/.test(rule),
+    'align and filter buttons should show their fill at all times: ' + rule);
+  assert.ok(!/background-color: transparent/.test(rule), 'no transparent resting state left: ' + rule);
+});
+
+test('the magnifier drops out once the field has something in it', function() {
+  var ui = loadUi();
+  assert.ok(ui.html.indexOf('id="frameName"') < ui.html.indexOf('icon icon--search'),
+    'the icon must follow the field for the sibling selector to reach it');
+  var hidden = cssRule('.input__field:not(:placeholder-shown) + .icon');
+  assert.ok(hidden && /display: none/.test(hidden), 'a filled field should hide its icon: ' + hidden);
+  var padding = cssRule('.input__field:not(:placeholder-shown)');
+  assert.ok(padding && /padding-left: var\(--size-xxsmall\)/.test(padding),
+    'the text should reclaim the space the icon reserved: ' + padding);
+});
+
+test('the section titles share a left edge with the buttons below them', function() {
+  var rule = cssRule('.section-title');
+  assert.ok(rule && /padding-left: 0/.test(rule), 'the DS title indent should be removed: ' + rule);
+});
+
+test('the selected radio dot sits centred in its circle', function() {
+  var rule = cssRule('.radio__label:before');
+  assert.ok(rule && /box-sizing: content-box/.test(rule),
+    'the circle needs content-box sizing for the DS dot offsets to centre: ' + rule);
+  assert.ok(/margin-top: 0/.test(rule), 'the DS baseline nudge tips the circle off its label: ' + rule);
+});
+
 test('the cleanup button reads Delete absolute', function() {
   var ui = loadUi();
   assert.ok(/<button id="deleteAbsBtn"[^>]*>Delete absolute<\/button>/.test(ui.html),

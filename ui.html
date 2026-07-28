@@ -2092,11 +2092,18 @@ body {
 /* --- button / icon-button resets ------------------------------------------ */
 
 /* The DS styles .icon-button assuming a <div>. SnapKit uses real <button>
-   elements so they can be disabled, which needs the UA styling cleared. */
+   elements so they can be disabled, which needs the UA styling cleared.
+   The DS fill only shows on hover; here the icon buttons carry it all the time
+   so the align grid and the type filter read as buttons at rest. */
 .icon-button {
-  background-color: transparent;
+  background-color: var(--hover-fill);
   padding: 0;
   outline: none;
+}
+
+/* Hover still has to move, so it goes one step darker than the resting fill. */
+.icon-button:hover {
+  background: var(--black1);
 }
 
 .icon-button:disabled {
@@ -2105,7 +2112,7 @@ body {
 }
 
 .icon-button:disabled:hover {
-  background: transparent;
+  background: var(--hover-fill);
 }
 
 .button {
@@ -2124,6 +2131,45 @@ body {
   cursor: default;
 }
 
+/* --- section titles ------------------------------------------------------- */
+
+/* The DS indents its titles by 8px. The buttons below start at the body edge,
+   so the indent has to go for the two to share a left edge. */
+.section-title {
+  padding-left: 0;
+}
+
+/* --- search field --------------------------------------------------------- */
+
+/* The DS field is white with a hairline border and only fills in on hover.
+   SnapKit keeps that fill as the resting state — same grey as the icon buttons
+   — so the field reads as an input without needing the border. */
+.input__field,
+.input__field:hover,
+.input__field:placeholder-shown,
+.input__field:placeholder-shown:hover,
+.input__field:active,
+.input__field:focus {
+  background-color: var(--hover-fill);
+  border-color: transparent;
+}
+
+/* Focus keeps the DS blue ring (the outline comes from the DS rule). */
+.input__field:active,
+.input__field:focus {
+  border-color: var(--blue);
+}
+
+/* Once something is typed the magnifier is noise: hide it and give the text
+   back the 32px it was reserving. */
+.input__field:not(:placeholder-shown) {
+  padding-left: var(--size-xxsmall);
+}
+
+.input__field:not(:placeholder-shown) + .icon {
+  display: none;
+}
+
 /* --- visibility radios ---------------------------------------------------- */
 
 .snapkit-radios {
@@ -2139,6 +2185,17 @@ body {
    cannot afford it. */
 .snapkit-radios .radio__label {
   padding-right: 0;
+}
+
+/* The DS draws the circle as a 10px box plus a 1px border and drops the 6px
+   selected dot at 2px/2px — geometry that only centres under content-box
+   sizing. The border-box reset at the top of this file shrank the circle to
+   8px inside, which pushed the dot down and to the right; opt this one element
+   back out. The top margin goes too: the label is a centred flex line, so the
+   DS baseline nudge only tips the circle off-centre against its text. */
+.radio__label:before {
+  box-sizing: content-box;
+  margin-top: 0;
 }
 
 /* --- element type filter -------------------------------------------------- */
@@ -2283,8 +2340,12 @@ body {
 
     <div class="snapkit-row">
       <div class="input input--with-icon snapkit-row__grow">
-        <div class="icon icon--search icon--black3"></div>
+        <!-- The magnifier comes after the field on purpose: it is absolutely
+             positioned, so DOM order changes nothing visually, but it lets the
+             css hide it once the field has content (there is no
+             previous-sibling selector to pair with :placeholder-shown). -->
         <input id="frameName" type="text" class="input__field" placeholder="Name(s) comma separated, * as wildcard...">
+        <div class="icon icon--search icon--black3"></div>
       </div>
       <div class="select-menu snapkit-filter">
         <button id="filterBtn" class="icon-button snapkit-filter__button" title="Filter by element type">

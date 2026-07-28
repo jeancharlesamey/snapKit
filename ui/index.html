@@ -19,8 +19,12 @@
 
     <div class="snapkit-row">
       <div class="input input--with-icon snapkit-row__grow">
-        <div class="icon icon--search icon--black3"></div>
+        <!-- The magnifier comes after the field on purpose: it is absolutely
+             positioned, so DOM order changes nothing visually, but it lets the
+             css hide it once the field has content (there is no
+             previous-sibling selector to pair with :placeholder-shown). -->
         <input id="frameName" type="text" class="input__field" placeholder="Name(s) comma separated, * as wildcard...">
+        <div class="icon icon--search icon--black3"></div>
       </div>
       <div class="select-menu snapkit-filter">
         <button id="filterBtn" class="icon-button snapkit-filter__button" title="Filter by element type">
