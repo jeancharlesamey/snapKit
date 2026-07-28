@@ -1,127 +1,184 @@
-# SnapKit v1.0.2-alpha
+# SnapKit v1.0.3-alpha
 
-A Figma plugin for managing prototype elements with absolute positioning, alignment, and component selection.
+A Figma plugin for finding elements fast and putting them where they belong — search by name, type and visibility, then set absolute positioning, align, duplicate or clean up in one click.
 
-**Privacy First**: SnapKit runs entirely within Figma. No data is sent to any server —everything- happens locally in the plugin and your Figma environment.
-
-
-## FEATURES
-
-### Element Selection
-- **Select** - Find and select elements by name (supports multiple names separated by commas, e.g., "Header, TapBar")
-- **Select Absolute** - Find and select only absolute-positioned elements by name — leave the name empty to get every absolute element in scope
-- **Name wildcards** - `*` matches any sequence of characters, so `Section*` finds "Section 1" and "Section 2", and `*Nav*` finds anything containing "Nav"
-- **Element type filter** - The filter icon next to the name field opens a small popover to narrow a search to **All types** (default), **Components only** (components, variant sets, instances), or **Everything but components** (frames, groups, text, shapes...). A **red dot** on the icon shows when a filter is active, and the result message names what was searched
-- **Visibility filter** - A radio group on one line under the name field picks what a search looks at: **Visible**, **Hidden**, or **All** (default). *Hidden* means the layer's own visibility is off (the eye icon in Figma) — opacity 0 or sitting inside a hidden parent are different states and are not treated as hidden. The search always descends into hidden containers, so a visible layer inside a hidden frame is still found. Combines with the type filter and with the name field: leave the name empty and pick *Hidden* to grab every hidden element in scope
-- **Explicit search context** - While a search runs, the loader spells out exactly what is being looked for: the kind of element (all elements or absolute only), the name(s) typed in the field (or *with any name* when it is empty), the active type filter, the visibility filter and the scope — e.g. *Searching for absolute elements named “Header” — components only — hidden elements only — inside the current selection*
-- Smart search: searches within selected frames, or all page frames if nothing is selected
-
-### Panel Layout
-The panel is grouped under two titles so the search controls and the things that change the document stay apart:
-- **Select** - the name field with its type-filter icon, the Visible / Hidden / All radio line, then **Select** and **Select absolute**
-- **Actions** - **Set to absolute** and **Set fixed scroll** on one line, then Duplicate, Remove absolute, Delete and the alignment grid
-
-### Layout Management
-- **Duplicate selected** - Clone elements placed immediately next to the original (in autolayout flow, or to the right for absolute/free elements)
-- **Set to absolute** - Convert elements to absolute positioning (perfect for sticky headers and fixed navigation)
-- **Set fixed scroll** - Currently disabled due to Figma API limitations
-
-### Alignment Tools
-Quickly align elements with 6 convenient buttons organized in 2 rows:
-- **Row 1 (Horizontal)**: Left, Center, Right
-- **Row 2 (Vertical)**: Top, Middle, Bottom
-
-Alignment adapts to the selected element's context:
-- **Autolayout frame** selected → changes the frame's own internal alignment (`primaryAxisAlignItems` / `counterAxisAlignItems`)
-- **Non-absolute child** inside an autolayout → changes `layoutAlign` on the child (cross-axis only)
-- **Absolute element** or regular frame child → moves via x/y position
-
-### Cleanup
-- **Remove absolute** - Smart removal that works 3 ways:
-  - With absolute elements selected: removes those elements
-  - With frames/sections selected: removes absolute elements within them
-  - With nothing selected: removes all absolute elements from the page
-- **Delete selected** - Delete currently selected elements
+**Privacy first**: SnapKit runs entirely inside Figma. Nothing is sent to a server — everything happens locally in the plugin and in your Figma file.
 
 
 ## INSTALLATION
 
 1. In Figma, go to **Plugins** → **Development** → **Import plugin from manifest**
-2. Select the `manifest.json` file from this folder
-3. The plugin will appear in your Plugins menu
+2. Pick the `manifest.json` file from this folder
+3. SnapKit appears in your Plugins menu
+
+
+## THE PANEL
+
+The panel is split into two titled sections so searching never gets mixed up with changing the document:
+
+```
+SELECT
+  [ Name(s) comma separated, * as wildcard...  ] [=]   ← filter icon (element type)
+  ( ) Visible      ( ) Hidden      (o) All             ← visibility, one line
+  [ Select ]                       [ Select absolute ]
+
+ACTIONS
+  [ Set to absolute ]              [ Set fixed scroll ]
+  [ Duplicate selected ]
+  [ Remove absolute ]
+  [ Delete selected ]
+  [ ← ] [ ↔ ] [ → ]                                    ← align horizontally
+  [ ↑ ] [ ↕ ] [ ↓ ]                                    ← align vertically
+```
+
+Everything under **Select** only reads the file. Everything under **Actions** modifies it.
+
+
+## SELECT
+
+### Search by name
+Type one or more names in the field and press **Select**. Names are comma separated, so `Header, TapBar, Footer` finds all three in one pass. The search is recursive: it walks into sections, frames and groups, not just the top level.
+
+`*` is a wildcard for any sequence of characters:
+
+| Pattern | Matches |
+| --- | --- |
+| `Section*` | "Section 1", "Section 2", "Sectionable" |
+| `*Nav*` | "MainNav", "Navigation", "Bottom Nav bar" |
+| `Tab*Bar` | "TabBar", "Tab Bar", "Tab-Nav-Bar" |
+
+### Select absolute
+**Select absolute** runs the same search but keeps only absolute-positioned elements. Unlike **Select**, it accepts an **empty name field** — that means "every absolute element in scope", which is the quickest way to audit the sticky headers and fixed navigation in a prototype.
+
+### Element type filter
+The **filter icon** next to the name field opens a small popover with three choices:
+
+- **All types** (default)
+- **Components only** — components, variant sets and instances
+- **Everything but components** — frames, groups, text, shapes…
+
+Use it when a frame and a real component share a name and you only want one of them. The filter is **sticky**: it stays on your choice until you change it, and a **red dot** on the icon is the reminder that a search is narrowed.
+
+### Visibility filter
+The radio group under the name field decides what a search looks at:
+
+- **Visible** — only layers currently shown
+- **Hidden** — only layers whose own visibility is off
+- **All** (default) — both
+
+**"Hidden" means the layer's own eye icon is off.** Opacity 0, or a visible layer sitting inside a hidden parent, are different states and are *not* treated as hidden. The search still descends into hidden containers, so a visible layer inside a hidden frame is found by the *Visible* filter.
+
+Leave the name field empty, pick **Hidden** and press **Select absolute** to grab every hidden absolute element in scope. The three filters — name, type, visibility — all combine.
+
+### Search scope
+- **Frames or sections selected** → SnapKit searches inside them
+- **Nothing selected** → SnapKit searches every frame on the page
+
+### Search feedback
+While a search runs, the loader spells out what is actually being looked for, so a surprising result is easy to explain:
+
+> *Searching for absolute elements named “Header” — components only — hidden elements only — inside the current selection*
+
+It names the element kind (all elements vs absolute only, from the button you pressed), the name(s) typed (or *with any name* when the field is empty), the type filter, the visibility filter and the scope. A long search cycles through progress messages and, after a while, offers a **Stop the selection** button. The result message repeats the active filters too.
+
+
+## ACTIONS
+
+### Positioning
+- **Set to absolute** — converts the selection to absolute positioning, for sticky headers and fixed navigation. Sections are skipped (Figma cannot make them absolute).
+- **Set fixed scroll** — currently disabled: the Figma plugin API does not expose it yet.
+- **Duplicate selected** — clones each element right next to the original: the next slot in an autolayout flow, or 8px to the right for absolute and free elements.
+
+### Alignment
+Six buttons, two rows — **Left / Center / Right**, then **Top / Middle / Bottom**. Alignment is context aware rather than forcing anything to absolute:
+
+| Selection | What alignment does |
+| --- | --- |
+| Autolayout frame | Sets the frame's own `primaryAxisAlignItems` / `counterAxisAlignItems` |
+| Non-absolute child of an autolayout | Sets `layoutAlign` on the child (cross axis only — the primary axis is not controllable per child) |
+| Absolute element, or child of a regular frame | Moves it via x/y, preserving the constraint on the other axis |
+
+**Shift-click** an alignment button with an *absolute autolayout frame* selected to change its internal alignment instead of moving it.
+
+### Cleanup
+- **Remove absolute** — works three ways depending on the selection:
+  - absolute elements selected → removes those
+  - frames or sections selected → removes the absolute elements inside them
+  - nothing selected → removes every absolute element on the page
+- **Delete selected** — deletes the current selection.
+
+Buttons enable and disable themselves as your selection changes: *Set to absolute* greys out when the selection is already absolute, *Remove absolute* greys out when there is nothing absolute to remove but stays available with nothing selected (whole-page mode).
+
+
+## RECIPES
+
+**Sticky header**
+1. Type `Header` → **Select**
+2. **Set to absolute**
+3. **Top**
+
+**Fixed bottom navigation**
+1. Select the frames containing the navigation
+2. Type `TapBar` → **Select**
+3. **Set to absolute** → **Bottom**
+
+**Select only real components, ignoring same-named frames**
+1. Filter icon → **Components only**
+2. Type the name → **Select**
+
+**Audit every hidden layer in a flow**
+1. Select the section or frames to check
+2. Leave the name field empty, pick **Hidden**
+3. **Select** — every hidden layer in scope is selected
+
+**Find hidden copies of one component**
+1. Type the component name, pick **Hidden**, filter icon → **Components only**
+2. **Select**
+
+**Bulk cleanup**
+1. Select the frames to clean, or nothing for the whole page
+2. **Remove absolute**
+
+
+## TIPS
+
+- **Selection drives the UI** — most buttons enable or disable based on what you have selected, and the search scope follows it too
+- **Filters are sticky** — the red dot on the filter icon and the highlighted radio are the reminders that a search is narrowed
+- **Read the loader** — if a search returns something unexpected, the line under the spinner says exactly what SnapKit looked for
+- **Empty name is a feature** — with *Select absolute* or a *Hidden* search it means "everything in scope"
+- **Sections are supported** — searches and *Remove absolute* both walk into sections
 
 
 ## DEVELOPMENT
 
-The plugin runs entirely inside Figma, but its core logic (`code.js`) is covered
-by a dependency-free test suite that mocks the Figma plugin API and exercises
-every UI message handler (select, duplicate, set-to-absolute, align, remove,
-delete). A second suite extracts the UI html from `code.js` and runs its inline
-script against a small DOM stub, covering the filter popover, the visibility
-radio group, the Select / Actions sections, the loader overlay and its
-search-context line, and the context-aware button states. Run both with Node:
+The plugin runs inside Figma, but its logic is covered by a dependency-free test suite that mocks the Figma plugin API:
+
+- `test/plugin.test.js` — every UI message handler (select, select absolute, duplicate, set to absolute, align, remove absolute, delete), including the type and visibility filters
+- `test/ui.test.js` — extracts the UI html from `code.js` and runs its inline script against a small DOM stub, covering the filter popover, the visibility radio group, the Select / Actions sections, the loader overlay and its search-context line, and the context-aware button states
 
 ```
 npm test
 ```
 
-No `npm install` is required — the tests use only Node's built-in modules.
+No `npm install` needed — the tests only use Node built-ins.
 
-
-## USAGE
-
-### Quick Start
-
-1. **Select frames (optional)** - Select frames to search within, or leave unselected to search the entire page
-2. **Find components** - Type a component name in the input field and click "Select"
-3. **Position elements** - Use "Set to Absolute" and alignment buttons to position
-4. **Fine-tune** - Adjust positioning with alignment tools
-
-### Common Use Cases
-
-#### Sticky Header in Prototype
-1. Type "Header" in the input field
-2. Click "Select"
-3. Click "Set to Absolute"
-4. Click "Top" to align to top (header will now stick when scrolling)
-
-#### Fixed Bottom Navigation
-1. Select frames containing navigation
-2. Type "TapBar" or your navigation component name
-3. Click "Select"
-4. Click "Set to Absolute"
-5. Click "Bottom" to align to bottom
-
-#### Bulk Cleanup
-1. Select frames with absolute elements, or leave nothing selected to clean the entire page
-2. Click "Remove Absolute"
-3. All absolute-positioned elements will be removed from selected scope
-
-#### Multi-Component Selection
-1. Type multiple component names separated by commas: "Header, TapBar, Footer"
-2. Click "Select" to select all matching elements at once
-
-#### Select Only Real Components (Ignore Same-Named Frames)
-1. Click the filter icon next to the name field
-2. Choose "Components only"
-3. Type the name and click "Select" — frames and groups with that name are skipped
-4. Choose "Everything but components" to do the opposite, or "All types" to reset
-
-
-## TIPS
-
-- **Selection matters**: Most buttons become enabled/disabled based on your current selection
-- **Comma-separated names**: Search for multiple components at once (e.g., "Header, TapBar, Footer")
-- **Wildcards**: `*` stands for any sequence of characters — "Tab*Bar" and "*Nav*" both work
-- **Type filter is sticky**: It stays on the chosen type until you change it — the red dot on the filter icon is the reminder that a search is narrowed
-- **Read the loader**: If a search returns something unexpected, the line under the spinner tells you what the plugin actually looked for (name, type filter, scope)
-- **Sections support**: Remove Absolute now works with Figma sections—it searches all frames within sections
-- **Alignment is context-aware**: Aligning an autolayout frame changes its internal alignment; aligning a child inside autolayout changes its cross-axis alignment; aligning an absolute element moves it via x/y
+Version numbers live in `README.md` (title, release notes, footer), `package.json`, the header comment of `code.js`, and the `name` field of `manifest.json`. The manifest `id` is deliberately left alone: Figma treats it as the plugin's identity.
 
 
 ## RELEASE NOTES
 
-### v1.0.2-alpha (in development)
+### v1.0.3-alpha (in development)
+**New Features:**
+- Visibility filter (issue #5, part 3): a Visible / Hidden / All radio group on one line under the name field narrows any search to what is shown or what is hidden. *Hidden* means the layer's own visibility is off — opacity 0 and hidden parents are explicitly not counted. It applies to both Select and Select absolute, combines with the name and type filters, and an empty name field means "everything hidden in scope".
+
+**UI Changes:**
+- The panel is now grouped under two titles: **Select** (name field, type filter, visibility radios, Select / Select absolute) and **Actions** (Set to absolute, Set fixed scroll, Duplicate, Remove absolute, Delete, alignment grid), so reading the file and changing it are visually separated
+- The loader search context and the result message both name the active visibility filter
+
+**Documentation:**
+- README rewritten around the two panel sections, with the search filters documented together, a recipes section, and previously undocumented behaviour written down (Shift-click alignment on absolute autolayout frames, the loader's Stop button, where version numbers live)
+
+### v1.0.2-alpha (July 27, 2026)
 **New Features:**
 - Explicit search context in the loader (part of issue #5): the spinner now carries a line describing the search in progress — element kind (all vs absolute only, from the button used), the name(s) typed (or "with any name" when the field is empty), the active element type filter and the scope (current selection vs whole page)
 
@@ -195,10 +252,11 @@ No `npm install` is required — the tests use only Node's built-in modules.
 - Added CLAUDE.md technical documentation
 - Cleaned up unused project files
 
+
 ## SUPPORT
 
 For issues or feedback, please contact the plugin maintainer via github.
 
 ---
 
-**Current Version**: v1.0.2-alpha (in development)
+**Current Version**: v1.0.3-alpha (in development)
