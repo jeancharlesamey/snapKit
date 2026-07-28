@@ -83,6 +83,17 @@ test('selectionchange event posts the new selection state', function() {
   figma._emit('selectionchange');
   assert.strictEqual(figma._messages[0].type, 'selection-change');
   assert.strictEqual(figma._messages[0].hasSelection, true);
+  // The count feeds the "Selection (n)" title in the panel.
+  assert.strictEqual(figma._messages[0].count, 1);
+});
+
+test('selection-change reports how many elements are selected', function() {
+  var a = mock.makeNode({ name: 'Header' });
+  var b = mock.makeNode({ name: 'Footer' });
+  var figma = loadPlugin(mock.makeFigma([a, b]));
+  assert.strictEqual(figma._send({ type: 'check-selection' })[0].count, 0);
+  figma.currentPage.selection = [a, b];
+  assert.strictEqual(figma._send({ type: 'check-selection' })[0].count, 2);
 });
 
 test('select-frame finds nested components by name (whole page)', function() {

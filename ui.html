@@ -2147,9 +2147,13 @@ body {
    is the first thing you see, so the field takes the icon-button height. The
    DS positions .input .icon at top:0 with a 32px box, so it lands dead centre
    once the margin is gone. */
+   The DS gives the field the 2px small radius and the buttons the 6px large
+   one; on a row where a field sits next to an icon button the two radii read as
+   a mistake, so the field takes the button's. */
 .input__field {
   height: var(--size-medium);
   margin: 0;
+  border-radius: var(--border-radius-large);
 }
 
 /* The DS field is white with a hairline border and only fills in on hover.
@@ -2165,20 +2169,61 @@ body {
   border-color: transparent;
 }
 
-/* Focus keeps the DS blue ring (the outline comes from the DS rule). */
+/* Focus draws a black ring instead of the DS blue one. The DS paints it as a
+   1px border plus an inset 1px outline, so both have to be recoloured — and the
+   empty field gets its own DS focus rule, which only loses to a selector of the
+   same weight. */
 .input__field:active,
-.input__field:focus {
-  border-color: var(--blue);
+.input__field:focus,
+.input__field:focus:placeholder-shown {
+  border-color: var(--black);
+  outline-color: var(--black);
 }
 
-/* Once something is typed the magnifier is noise: hide it and give the text
-   back the 32px it was reserving. */
+/* Once something is typed the magnifier is noise: hide it, hand the text the
+   32px it was reserving on the left, and reserve the same on the right for the
+   clear button that takes its place. */
 .input__field:not(:placeholder-shown) {
   padding-left: var(--size-xxsmall);
+  padding-right: var(--size-medium);
 }
 
 .input__field:not(:placeholder-shown) + .icon {
   display: none;
+}
+
+/* The X only exists while there is something to clear. It fills the 32px the
+   filled field keeps free on the right. */
+.snapkit-clear {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-medium);
+  height: var(--size-medium);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.input__field:not(:placeholder-shown) ~ .snapkit-clear {
+  display: flex;
+}
+
+/* `.input .icon` pins any icon inside a field to the field's left edge and
+   fades it to 30% — the one in the clear button stays centred in its own box. */
+.snapkit-clear .icon {
+  position: static;
+  opacity: 1;
+}
+
+/* The glyph is a black svg tinted by `.icon--black8`; dropping the tint is the
+   whole hover state. */
+.snapkit-clear:hover .icon {
+  filter: none;
 }
 
 /* --- visibility radios ---------------------------------------------------- */
@@ -2374,16 +2419,22 @@ body {
   <div class="snapkit">
     <div id="message" class="snapkit-toast"></div>
 
-    <div class="section-title">Select</div>
+    <!-- The count outlives the toast, so how many elements a search picked up is
+         still readable once the toast has gone. -->
+    <div class="section-title">Selection <span id="selectionCount">(0)</span></div>
 
     <div class="snapkit-row">
       <div class="input input--with-icon snapkit-row__grow">
-        <!-- The magnifier comes after the field on purpose: it is absolutely
-             positioned, so DOM order changes nothing visually, but it lets the
-             css hide it once the field has content (there is no
-             previous-sibling selector to pair with :placeholder-shown). -->
+        <!-- The magnifier and the clear button both come after the field on
+             purpose: both are absolutely positioned, so DOM order changes
+             nothing visually, but it lets the css swap them as the field fills
+             (there is no previous-sibling selector to pair with
+             :placeholder-shown). -->
         <input id="frameName" type="text" class="input__field" placeholder="Name(s) comma separated, * as wildcard...">
         <div class="icon icon--search icon--black3"></div>
+        <button id="clearName" class="snapkit-clear" title="Clear the name field">
+          <div class="icon icon--close icon--black8"></div>
+        </button>
       </div>
       <div class="select-menu snapkit-filter">
         <button id="filterBtn" class="icon-button snapkit-filter__button" title="Filter by element type">
@@ -2407,16 +2458,16 @@ body {
 
     <div class="snapkit-radios" id="visibilityRow">
       <div class="radio">
+        <input id="visAll" class="radio__button" type="radio" name="visibility" data-visibility="all" checked>
+        <label class="radio__label" for="visAll">All</label>
+      </div>
+      <div class="radio">
         <input id="visVisible" class="radio__button" type="radio" name="visibility" data-visibility="visible">
         <label class="radio__label" for="visVisible">Visible</label>
       </div>
       <div class="radio">
         <input id="visHidden" class="radio__button" type="radio" name="visibility" data-visibility="hidden">
         <label class="radio__label" for="visHidden">Hidden</label>
-      </div>
-      <div class="radio">
-        <input id="visAll" class="radio__button" type="radio" name="visibility" data-visibility="all" checked>
-        <label class="radio__label" for="visAll">All</label>
       </div>
     </div>
 
@@ -2486,10 +2537,12 @@ var overlayContext = document.getElementById('overlayContext');
 var filterBtn = document.getElementById('filterBtn');
 var filterPopover = document.getElementById('filterPopover');
 var filterOptions = filterPopover.querySelectorAll('.select-menu__item');
+var clearNameBtn = document.getElementById('clearName');
+var selectionCount = document.getElementById('selectionCount');
 var visibilityRadios = [
+  document.getElementById('visAll'),
   document.getElementById('visVisible'),
-  document.getElementById('visHidden'),
-  document.getElementById('visAll')
+  document.getElementById('visHidden')
 ];
 
 var typeFilter = 'all';
@@ -2510,6 +2563,15 @@ for (var vi = 0; vi < visibilityRadios.length; vi++) {
     setVisibilityFilter(this.getAttribute('data-visibility'));
   };
 }
+
+// --- name field -------------------------------------------------------------
+
+// The X is shown/hidden by css off :placeholder-shown, so emptying the field is
+// all this has to do.
+clearNameBtn.onclick = function() {
+  frameNameInput.value = '';
+  if (frameNameInput.focus) frameNameInput.focus();
+};
 
 // --- element type filter ----------------------------------------------------
 
@@ -2663,12 +2725,19 @@ window.onmessage = function(event) {
     hideOverlay();
     showMessage(msg.text, 'error');
   } else if (msg.type === 'selection-change') {
-    updateButtonStates(msg.hasSelection, msg.hasAbsolute, msg.hasNonAbsolute, msg.hasContainer);
+    updateButtonStates(msg.hasSelection, msg.hasAbsolute, msg.hasNonAbsolute, msg.hasContainer, msg.count);
   }
 };
 
-function updateButtonStates(hasSelection, hasAbsolute, hasNonAbsolute, hasContainer) {
+// The toast that announces a search result is gone after 3s; the title keeps the
+// number on screen for as long as the selection lives.
+function setSelectionCount(count) {
+  selectionCount.textContent = '(' + (count || 0) + ')';
+}
+
+function updateButtonStates(hasSelection, hasAbsolute, hasNonAbsolute, hasContainer, count) {
   hasSelectionScope = hasSelection;
+  setSelectionCount(count);
   var baseButtons = [duplicateBtn, deleteBtn, alignLeftBtn, alignCenterBtn, alignRightBtn, alignTopBtn, alignMiddleBtn, alignBottomBtn];
   for (var i = 0; i < baseButtons.length; i++) {
     baseButtons[i].disabled = !hasSelection;
@@ -2681,6 +2750,7 @@ function updateButtonStates(hasSelection, hasAbsolute, hasNonAbsolute, hasContai
 parent.postMessage({ pluginMessage: { type: 'check-selection' } }, '*');
 setTypeFilter(typeFilter);
 setVisibilityFilter(visibilityFilter);
+setSelectionCount(0);
 </script>
 </body>
 </html>

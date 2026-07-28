@@ -15,16 +15,22 @@
   <div class="snapkit">
     <div id="message" class="snapkit-toast"></div>
 
-    <div class="section-title">Select</div>
+    <!-- The count outlives the toast, so how many elements a search picked up is
+         still readable once the toast has gone. -->
+    <div class="section-title">Selection <span id="selectionCount">(0)</span></div>
 
     <div class="snapkit-row">
       <div class="input input--with-icon snapkit-row__grow">
-        <!-- The magnifier comes after the field on purpose: it is absolutely
-             positioned, so DOM order changes nothing visually, but it lets the
-             css hide it once the field has content (there is no
-             previous-sibling selector to pair with :placeholder-shown). -->
+        <!-- The magnifier and the clear button both come after the field on
+             purpose: both are absolutely positioned, so DOM order changes
+             nothing visually, but it lets the css swap them as the field fills
+             (there is no previous-sibling selector to pair with
+             :placeholder-shown). -->
         <input id="frameName" type="text" class="input__field" placeholder="Name(s) comma separated, * as wildcard...">
         <div class="icon icon--search icon--black3"></div>
+        <button id="clearName" class="snapkit-clear" title="Clear the name field">
+          <div class="icon icon--close icon--black8"></div>
+        </button>
       </div>
       <div class="select-menu snapkit-filter">
         <button id="filterBtn" class="icon-button snapkit-filter__button" title="Filter by element type">
@@ -48,16 +54,16 @@
 
     <div class="snapkit-radios" id="visibilityRow">
       <div class="radio">
+        <input id="visAll" class="radio__button" type="radio" name="visibility" data-visibility="all" checked>
+        <label class="radio__label" for="visAll">All</label>
+      </div>
+      <div class="radio">
         <input id="visVisible" class="radio__button" type="radio" name="visibility" data-visibility="visible">
         <label class="radio__label" for="visVisible">Visible</label>
       </div>
       <div class="radio">
         <input id="visHidden" class="radio__button" type="radio" name="visibility" data-visibility="hidden">
         <label class="radio__label" for="visHidden">Hidden</label>
-      </div>
-      <div class="radio">
-        <input id="visAll" class="radio__button" type="radio" name="visibility" data-visibility="all" checked>
-        <label class="radio__label" for="visAll">All</label>
       </div>
     </div>
 
