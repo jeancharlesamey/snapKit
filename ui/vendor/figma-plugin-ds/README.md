@@ -23,15 +23,21 @@ therefore checked in and inlined into `ui.html` by `scripts/build-ui.js`.
 2. Refresh the version line above and, if the licence changed, `LICENSE`.
 3. Run `npm run build:ui` to regenerate `ui.html`.
 4. Run `npm test`.
+5. Re-read **`ui/ds-overrides.css`** and open the panel. That file holds every
+   local change to a DS class — nothing else in `ui/` styles one, and the test
+   suite enforces it — so it is the only place an upstream change to a selector,
+   a specificity or a property can break SnapKit's look. Each override says in a
+   comment which DS behaviour it is answering, so an override whose reason has
+   gone away can be deleted rather than kept forever.
 
 ## The one transform applied at build time
 
 Upstream ships three `@font-face` rules that pull Inter from `rsms.me`. The build
 script strips any `@font-face` that points at a remote URL, so the plugin never
 reaches out to the network (Figma would block it anyway without a
-`networkAccess` entry in the manifest). `ui/snapkit.css` overrides `--font-stack`
-with a local stack instead, starting with Inter — the font Figma itself uses, so
-it is already installed for most users.
+`networkAccess` entry in the manifest). `ui/ds-overrides.css` overrides
+`--font-stack` with a local stack instead, starting with Inter — the font Figma
+itself uses, so it is already installed for most users.
 
 ## What is *not* vendored
 

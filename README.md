@@ -1,4 +1,4 @@
-# SnapKit v1.0.3-alpha
+# SnapKit v1.0.4-alpha
 
 A Figma plugin for finding elements fast and putting them where they belong — search by name, type and visibility, then set absolute positioning, align, duplicate or clean up in one click.
 
@@ -162,7 +162,8 @@ ui.html                                    GENERATED — do not edit
 scripts/build-ui.js                        builds ui.html from ui/
 ui/
   index.html                               the panel markup
-  snapkit.css                              layout + the few DS overrides
+  ds-overrides.css                         the only local changes to the DS
+  snapkit.css                              layout + SnapKit's own components
   snapkit.js                               the panel behaviour
   vendor/figma-plugin-ds/                  the design system, vendored (MIT)
 test/                                      the test suite
@@ -172,7 +173,12 @@ test/                                      the test suite
 
 The UI uses **[figma-plugin-ds](https://github.com/thomas-lowry/figma-plugin-ds)** by Tom Lowry, a CSS library that reproduces Figma's own controls. Its stylesheet is **copied into `ui/vendor/figma-plugin-ds/`** rather than installed: SnapKit has no `npm install` step, and a plugin iframe cannot resolve a remote or relative stylesheet anyway. `ui/vendor/figma-plugin-ds/README.md` records the version and how to update it — drop in the new file, run `npm run build:ui`.
 
-`ui/snapkit.css` is deliberately thin: layout, two `<button>` resets the DS does not ship, and the toast and search overlay it has no equivalent for. New controls should reach for a DS class first.
+The overrides are kept apart from the rest of the CSS so an upstream release cannot quietly break the panel:
+
+- **`ui/ds-overrides.css`** is the only file that styles a DS class, and the vendored copy is never patched. It is inlined right after the design system, so at equal specificity it wins on source order. When the DS is updated, this is the one file to re-read
+- **`ui/snapkit.css`** is layout plus the components the DS has no equivalent for (the toast, the search overlay, the field's clear button). It may lean on a DS class to *find* an element, but every property it sets lands on a `.snapkit-*` element of our own
+
+`test/ui.test.js` enforces both halves of that split, so a DS override added to the wrong file fails the suite. New controls should reach for a DS class first.
 
 ### The build step
 
@@ -189,7 +195,7 @@ npm run build:ui
 The plugin runs inside Figma, but its logic is covered by a dependency-free test suite that mocks the Figma plugin API:
 
 - `test/plugin.test.js` — every UI message handler (select, select absolute, duplicate, set to absolute, align, delete absolute, delete), including the type and visibility filters
-- `test/ui.test.js` — reads the built `ui.html` and runs its inline script against a small DOM stub, covering the type filter menu, the visibility radio group, the Selection / Actions sections, the selection count and the field's clear button, the loader overlay and its search-context line, the context-aware button states, and that nothing in the panel is loaded from the network
+- `test/ui.test.js` — reads the built `ui.html` and runs its inline script against a small DOM stub, covering the type filter menu, the visibility radio group, the Selection / Actions sections, the selection count and the field's clear button, the loader overlay and its search-context line, the context-aware button states, that the DS overrides stay in their own stylesheet, and that nothing in the panel is loaded from the network
 
 ```
 npm test
@@ -202,7 +208,15 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 
 ## RELEASE NOTES
 
-### v1.0.3-alpha (in development)
+### v1.0.4-alpha (in development)
+**UI Changes:**
+- The magnifier in the search field is now the same grey as the placeholder text next to it. It carried an extra `icon--black3` tint on top of the design system's own 30% opacity, which washed it out — a plain black glyph at that opacity is the placeholder colour exactly
+
+**Improvements:**
+- Every local change to a figma-plugin-ds control moved into its own stylesheet, **`ui/ds-overrides.css`**, inlined between the vendored design system and SnapKit's own styles. `ui/snapkit.css` is now layout and the components the DS has no equivalent for, and never styles a DS class. Updating the design system is still a single file drop, and now has exactly one file to re-check afterwards — a test enforces the split and that the vendored copy stays unpatched
+- Fixed an unterminated comment in the SnapKit stylesheet that was swallowing the `.input__field` rule, so the search field only now actually gets the button corner radius and the icon-button height it was meant to have
+
+### v1.0.3-alpha (July 28, 2026)
 **New Features:**
 - Visibility filter (issue #5, part 3): a Visible / Hidden / All radio group on one line under the name field narrows any search to what is shown or what is hidden. *Hidden* means the layer's own visibility is off — opacity 0 and hidden parents are explicitly not counted. It applies to both Select and Select absolute, combines with the name and type filters, and an empty name field means "everything hidden in scope".
 
@@ -298,4 +312,4 @@ For issues or feedback, please contact the plugin maintainer via github.
 
 ---
 
-**Current Version**: v1.0.3-alpha (in development)
+**Current Version**: v1.0.4-alpha (in development)

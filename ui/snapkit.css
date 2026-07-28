@@ -1,31 +1,19 @@
-/* SnapKit — the thin layer on top of figma-plugin-ds.
+/* SnapKit — the panel's own styles.
  *
  * Everything that looks like a Figma control (buttons, input, radios, the type
- * menu, the icons) comes from the vendored design system. This file only does
- * three things: layout, a couple of button/icon-button resets the DS does not
- * ship, and the two components the DS has no equivalent for — the toast and the
- * search overlay. Anything added here should use the DS tokens, never raw
- * colours or font sizes.
+ * menu, the icons) comes from the vendored design system, and every local change
+ * to one of those controls lives in ds-overrides.css. This file is only the
+ * layout and the two components the DS has no equivalent for — the toast and the
+ * search overlay.
+ *
+ * It never styles a design-system class: it may lean on one to find an element
+ * (`.input__field:not(:placeholder-shown) ~ .snapkit-clear` is in the overrides
+ * file for that reason), but every declaration here lands on a .snapkit-*
+ * element of our own. That keeps an upstream DS release to one file to re-read.
+ * Values are DS tokens, never raw colours or font sizes.
  */
 
-:root {
-  /* The DS asks for Inter from a remote host; the build strips that @font-face,
-     so fall back through the local stack. Figma itself ships Inter, so most
-     users already have it. */
-  --font-stack: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
-
-/* The DS sizes its controls with `height` and adds borders on top, and only
-   sets box-sizing on <body>. Without this reset a full-width .button overflows
-   its grid cell by its 2px border. */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
 body {
-  font-family: var(--font-stack);
   padding: var(--size-xxsmall);
   background-color: var(--white);
 }
@@ -57,123 +45,11 @@ body {
 .snapkit-grid--2 { grid-template-columns: 1fr 1fr; }
 .snapkit-grid--3 { grid-template-columns: repeat(3, 1fr); }
 
-/* DS buttons hug their label; in a grid or on their own line they should fill
-   the row and centre the label. */
-.snapkit-block,
-.snapkit-grid .button {
-  width: 100%;
-  justify-content: center;
-}
+/* --- clear button in the search field ------------------------------------- */
 
-.snapkit-grid .icon-button {
-  width: 100%;
-}
-
-/* --- button / icon-button resets ------------------------------------------ */
-
-/* The DS styles .icon-button assuming a <div>. SnapKit uses real <button>
-   elements so they can be disabled, which needs the UA styling cleared.
-   The DS fill only shows on hover; here the icon buttons carry it all the time
-   so the align grid and the type filter read as buttons at rest. */
-.icon-button {
-  background-color: var(--hover-fill);
-  padding: 0;
-  outline: none;
-}
-
-/* Hover still has to move, so it goes one step darker than the resting fill. */
-.icon-button:hover {
-  background: var(--black1);
-}
-
-.icon-button:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
-.icon-button:disabled:hover {
-  background: var(--hover-fill);
-}
-
-.button {
-  cursor: pointer;
-}
-
-.button:disabled {
-  cursor: default;
-}
-
-/* "Set fixed scroll" reads as disabled but stays clickable, so pressing it can
-   explain why the Figma API cannot do it yet. */
-.button.snapkit-is-disabled {
-  border-color: var(--black3);
-  color: var(--black3);
-  cursor: default;
-}
-
-/* --- section titles ------------------------------------------------------- */
-
-/* The DS indents its titles by 8px. The buttons below start at the body edge,
-   so the indent has to go for the two to share a left edge. */
-.section-title {
-  padding-left: 0;
-}
-
-/* --- search field --------------------------------------------------------- */
-
-/* The DS field is 30px tall with a 1px margin above and below, which leaves it
-   2px shorter than the 32px icon button sitting next to it. That went unnoticed
-   while the field was white, but now that both carry the same grey the mismatch
-   is the first thing you see, so the field takes the icon-button height. The
-   DS positions .input .icon at top:0 with a 32px box, so it lands dead centre
-   once the margin is gone. */
-   The DS gives the field the 2px small radius and the buttons the 6px large
-   one; on a row where a field sits next to an icon button the two radii read as
-   a mistake, so the field takes the button's. */
-.input__field {
-  height: var(--size-medium);
-  margin: 0;
-  border-radius: var(--border-radius-large);
-}
-
-/* The DS field is white with a hairline border and only fills in on hover.
-   SnapKit keeps that fill as the resting state — same grey as the icon buttons
-   — so the field reads as an input without needing the border. */
-.input__field,
-.input__field:hover,
-.input__field:placeholder-shown,
-.input__field:placeholder-shown:hover,
-.input__field:active,
-.input__field:focus {
-  background-color: var(--hover-fill);
-  border-color: transparent;
-}
-
-/* Focus draws a black ring instead of the DS blue one. The DS paints it as a
-   1px border plus an inset 1px outline, so both have to be recoloured — and the
-   empty field gets its own DS focus rule, which only loses to a selector of the
-   same weight. */
-.input__field:active,
-.input__field:focus,
-.input__field:focus:placeholder-shown {
-  border-color: var(--black);
-  outline-color: var(--black);
-}
-
-/* Once something is typed the magnifier is noise: hide it, hand the text the
-   32px it was reserving on the left, and reserve the same on the right for the
-   clear button that takes its place. */
-.input__field:not(:placeholder-shown) {
-  padding-left: var(--size-xxsmall);
-  padding-right: var(--size-medium);
-}
-
-.input__field:not(:placeholder-shown) + .icon {
-  display: none;
-}
-
-/* The X only exists while there is something to clear. It fills the 32px the
-   filled field keeps free on the right. */
+/* The X fills the 32px the filled field keeps free on its right. It is hidden
+   until there is something to clear — that half of the swap needs the field's
+   :placeholder-shown state, so it sits in ds-overrides.css. */
 .snapkit-clear {
   display: none;
   position: absolute;
@@ -189,66 +65,13 @@ body {
   cursor: pointer;
 }
 
-.input__field:not(:placeholder-shown) ~ .snapkit-clear {
-  display: flex;
-}
-
-/* `.input .icon` pins any icon inside a field to the field's left edge and
-   fades it to 30% — the one in the clear button stays centred in its own box. */
-.snapkit-clear .icon {
-  position: static;
-  opacity: 1;
-}
-
-/* The glyph is a black svg tinted by `.icon--black8`; dropping the tint is the
-   whole hover state. */
-.snapkit-clear:hover .icon {
-  filter: none;
-}
-
 /* --- visibility radios ---------------------------------------------------- */
 
+/* One line, three even columns. The circles themselves need DS surgery to line
+   up — see ds-overrides.css. */
 .snapkit-radios {
   display: flex;
   align-items: center;
-}
-
-.snapkit-radios .radio {
-  flex: 1 1 0;
-}
-
-/* The DS leaves the (invisible) radio input in the flow, so every circle starts
-   10px in from its row — the same 10px indent that was just taken off the
-   section titles, only now on the radios. Taking the input out of the flow lets
-   the DS's own -16px label margin land the first circle on the panel's left
-   edge, in line with the titles, the field and the buttons. The input keeps its
-   own box for the focus ring, centred on the 32px row. */
-.snapkit-radios .radio__button {
-  position: absolute;
-  top: 11px;
-  left: 0;
-}
-
-/* The DS reserves 16px after every label; three radios on one 320px line
-   cannot afford it. */
-.snapkit-radios .radio__label {
-  padding-right: 0;
-}
-
-/* The DS drops the 6px selected dot at a hard-coded `2px 2px`, which only lands
-   in the middle if the circle's padding box happens to be 10px. Under the DS's
-   own `* { box-sizing: border-box }` the 1px border eats into the 10px box and
-   leaves 8px, so the dot sits 2px from the top-left and flush against the
-   bottom-right — the off-centre circle. Centring the dot instead of measuring
-   it fixes that without resizing the circle away from the DS's 10px. */
-.radio__button:checked + .radio__label:before {
-  background-position: center;
-}
-
-/* The label is a centred flex line, so the DS's 2px baseline nudge only tips
-   the circle off-centre against its own text. */
-.radio__label:before {
-  margin-top: 0;
 }
 
 /* --- element type filter -------------------------------------------------- */
@@ -262,16 +85,6 @@ body {
   flex: none;
 }
 
-/* The trigger lives inside .select-menu so the DS menu can anchor to it, which
-   also drags in `.select-menu .icon` — a rule meant for the icon that precedes
-   a select's label, so it shifts the glyph 8px left and 2px up and fades it to
-   30%. Inside a 32px icon button that reads as a misaligned, greyed-out icon;
-   undo it so the glyph is centred and as solid as the align icons. */
-.snapkit-filter__button .icon {
-  margin: 0;
-  opacity: 1;
-}
-
 .snapkit-filter__dot {
   display: none;
   position: absolute;
@@ -282,7 +95,7 @@ body {
   border-radius: 50%;
   background-color: var(--red);
   border: 2px solid var(--white);
-  /* .icon-button * paints its children black — the dot has to opt out. */
+  /* The DS paints every child of an icon button black — the dot has to opt out. */
   filter: none;
 }
 

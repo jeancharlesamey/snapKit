@@ -4,11 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SnapKit</title>
-  <!-- Both stylesheets and the script are inlined into the built ui.html by
+  <!-- The stylesheets and the script are inlined into the built ui.html by
        scripts/build-ui.js — Figma serves the plugin UI from a sandboxed iframe
        that cannot resolve relative files. Open this file directly in a browser
-       to preview the panel. -->
+       to preview the panel.
+
+       Order matters: the vendored design system first, then the local overrides
+       of it (the only file that touches a DS class, so an upstream drop-in has
+       one file to re-check), then SnapKit's own layout and components. -->
   <link rel="stylesheet" href="vendor/figma-plugin-ds/figma-plugin-ds.css">
+  <link rel="stylesheet" href="ds-overrides.css">
   <link rel="stylesheet" href="snapkit.css">
 </head>
 <body>
@@ -27,7 +32,11 @@
              (there is no previous-sibling selector to pair with
              :placeholder-shown). -->
         <input id="frameName" type="text" class="input__field" placeholder="Name(s) comma separated, * as wildcard...">
-        <div class="icon icon--search icon--black3"></div>
+        <!-- No icon--black3 here: that filter on top of the DS's own 30% opacity
+             made the magnifier much lighter than the placeholder. Plain black at
+             the DS opacity is the placeholder grey exactly — see
+             ds-overrides.css. -->
+        <div class="icon icon--search"></div>
         <button id="clearName" class="snapkit-clear" title="Clear the name field">
           <div class="icon icon--close icon--black8"></div>
         </button>
