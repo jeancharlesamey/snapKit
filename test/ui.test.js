@@ -417,6 +417,13 @@ test('the selected radio dot sits centred in its circle', function() {
     'the DS baseline nudge tips the circle off its label: ' + circle);
 });
 
+test('the radio circles share the left edge with the titles and buttons', function() {
+  var rule = cssRule('.snapkit-radios .radio__button');
+  assert.ok(rule && /position: absolute/.test(rule),
+    'the invisible DS radio input holds 10px of the row, indenting every ' +
+    'circle — take it out of the flow: ' + rule);
+});
+
 test('the cleanup button reads Delete absolute', function() {
   var ui = loadUi();
   assert.ok(/<button id="deleteAbsBtn"[^>]*>Delete absolute<\/button>/.test(ui.html),
