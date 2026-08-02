@@ -55,10 +55,13 @@ for (var vi = 0; vi < visibilityRadios.length; vi++) {
 // --- name field -------------------------------------------------------------
 
 // The X is shown/hidden by css off :placeholder-shown, so emptying the field is
-// all this has to do.
+// most of this. It also clears the canvas selection: the X means "start this
+// search over", and a stale selection would otherwise silently narrow the next
+// one to "in selected frames" instead of the whole page.
 clearNameBtn.onclick = function() {
   frameNameInput.value = '';
   if (frameNameInput.focus) frameNameInput.focus();
+  parent.postMessage({ pluginMessage: { type: 'clear-selection' } }, '*');
 };
 
 // --- element type filter ----------------------------------------------------
@@ -124,8 +127,8 @@ function searchContextText(mode, name) {
     ? 'named ' + names.map(function(n) { return '“' + n + '”'; }).join(', ')
     : 'with any name';
   var scope = hasSelectionScope ? 'inside the current selection' : 'across the whole page';
-  return 'Searching for ' + subject + ' ' + nameText + ' — ' + typeFilterPhrase() +
-    ' — ' + visibilityPhrase() + ' — ' + scope;
+  return 'Searching for ' + subject + ' ' + nameText + ' / ' + typeFilterPhrase() +
+    ' / ' + visibilityPhrase() + ' / ' + scope;
 }
 
 function showOverlay(context) {

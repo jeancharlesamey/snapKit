@@ -2267,6 +2267,18 @@ body {
   margin: 0;
   opacity: 1;
 }
+
+/* --- search overlay --------------------------------------------------------- */
+
+/* The spinner reads as the panel's one big loading cue, so it runs at twice
+   the DS's standard icon size. background-size has to be set explicitly: the
+   icon is a 32px svg centred by background-position, so without it the box
+   just grows around the same small glyph instead of scaling it up. */
+.snapkit-overlay .icon--spinner {
+  width: calc(var(--size-medium) * 2);
+  height: calc(var(--size-medium) * 2);
+  background-size: 100% 100%;
+}
 </style>
 <style>
 /* snapkit.css */
@@ -2427,7 +2439,7 @@ body {
   gap: var(--size-xsmall);
   padding: var(--size-small);
   text-align: center;
-  background-color: var(--white8);
+  background-color: var(--black8);
 }
 
 .snapkit-overlay.is-visible {
@@ -2436,7 +2448,7 @@ body {
 
 .snapkit-overlay__context {
   max-width: 262px;
-  color: var(--black8);
+  color: var(--white);
 }
 
 .snapkit-overlay__msgs {
@@ -2451,7 +2463,7 @@ body {
   left: 0;
   right: 0;
   opacity: 0;
-  color: var(--black8);
+  color: var(--white);
 }
 
 /* The messages take turns while a long search runs, then the last one and the
@@ -2566,7 +2578,7 @@ body {
   </div>
 
   <div class="snapkit-overlay" id="overlay">
-    <div class="icon icon--spinner icon--spin icon--blue"></div>
+    <div class="icon icon--spinner icon--spin icon--white"></div>
     <div class="snapkit-overlay__context type type--large type--bold" id="overlayContext"></div>
     <div class="snapkit-overlay__msgs">
       <span class="snapkit-overlay__msg m1 type type--small">Walking through every layer in scope</span>
@@ -2636,10 +2648,13 @@ for (var vi = 0; vi < visibilityRadios.length; vi++) {
 // --- name field -------------------------------------------------------------
 
 // The X is shown/hidden by css off :placeholder-shown, so emptying the field is
-// all this has to do.
+// most of this. It also clears the canvas selection: the X means "start this
+// search over", and a stale selection would otherwise silently narrow the next
+// one to "in selected frames" instead of the whole page.
 clearNameBtn.onclick = function() {
   frameNameInput.value = '';
   if (frameNameInput.focus) frameNameInput.focus();
+  parent.postMessage({ pluginMessage: { type: 'clear-selection' } }, '*');
 };
 
 // --- element type filter ----------------------------------------------------
@@ -2705,8 +2720,8 @@ function searchContextText(mode, name) {
     ? 'named ' + names.map(function(n) { return '“' + n + '”'; }).join(', ')
     : 'with any name';
   var scope = hasSelectionScope ? 'inside the current selection' : 'across the whole page';
-  return 'Searching for ' + subject + ' ' + nameText + ' — ' + typeFilterPhrase() +
-    ' — ' + visibilityPhrase() + ' — ' + scope;
+  return 'Searching for ' + subject + ' ' + nameText + ' / ' + typeFilterPhrase() +
+    ' / ' + visibilityPhrase() + ' / ' + scope;
 }
 
 function showOverlay(context) {

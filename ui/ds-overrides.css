@@ -242,3 +242,15 @@ body {
   margin: 0;
   opacity: 1;
 }
+
+/* --- search overlay --------------------------------------------------------- */
+
+/* The spinner reads as the panel's one big loading cue, so it runs at twice
+   the DS's standard icon size. background-size has to be set explicitly: the
+   icon is a 32px svg centred by background-position, so without it the box
+   just grows around the same small glyph instead of scaling it up. */
+.snapkit-overlay .icon--spinner {
+  width: calc(var(--size-medium) * 2);
+  height: calc(var(--size-medium) * 2);
+  background-size: 100% 100%;
+}

@@ -155,7 +155,7 @@ body {
   gap: var(--size-xsmall);
   padding: var(--size-small);
   text-align: center;
-  background-color: var(--white8);
+  background-color: var(--black8);
 }
 
 .snapkit-overlay.is-visible {
@@ -164,7 +164,7 @@ body {
 
 .snapkit-overlay__context {
   max-width: 262px;
-  color: var(--black8);
+  color: var(--white);
 }
 
 .snapkit-overlay__msgs {
@@ -179,7 +179,7 @@ body {
   left: 0;
   right: 0;
   opacity: 0;
-  color: var(--black8);
+  color: var(--white);
 }
 
 /* The messages take turns while a long search runs, then the last one and the

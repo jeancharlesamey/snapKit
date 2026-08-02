@@ -5,36 +5,80 @@
 // injected here as __html__ through the manifest ui field.
 figma.showUI(__html__, { width: 320, height: 420 });
 
-// Listen for selection changes and update UI button states
-figma.on('selectionchange', function() {
-  var selection = figma.currentPage.selection;
-  var hasSelection = selection.length > 0;
+// --- selection state ----------------------------------------------------------
+// Shared by the 'selectionchange' event and the 'check-selection' request so
+// the two can never drift out of sync on what counts as absolute / non-absolute
+// / a container.
+function computeSelectionState(selection) {
   var hasAbsolute = false;
   var hasNonAbsolute = false;
   var hasContainer = false;
   for (var i = 0; i < selection.length; i++) {
     var n = selection[i];
-    if ('layoutPositioning' in n && n.layoutPositioning === 'ABSOLUTE') {
+    if (isAbsolute(n)) {
       hasAbsolute = true;
-    } else if (n.type !== 'FRAME' && n.type !== 'SECTION') {
+    } else {
       hasNonAbsolute = true;
     }
     if (n.type === 'FRAME' || n.type === 'SECTION' || n.type === 'COMPONENT' || n.type === 'INSTANCE' || n.type === 'GROUP') {
       hasContainer = true;
     }
   }
-  // count feeds the "Selection (n)" title, which outlives the result toast.
-  figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection, hasAbsolute: hasAbsolute, hasNonAbsolute: hasNonAbsolute, hasContainer: hasContainer, count: selection.length });
+  return {
+    hasSelection: selection.length > 0,
+    hasAbsolute: hasAbsolute,
+    hasNonAbsolute: hasNonAbsolute,
+    hasContainer: hasContainer,
+    count: selection.length
+  };
+}
+
+function postSelectionState(selection) {
+  var state = computeSelectionState(selection);
+  figma.ui.postMessage({
+    type: 'selection-change',
+    hasSelection: state.hasSelection,
+    hasAbsolute: state.hasAbsolute,
+    hasNonAbsolute: state.hasNonAbsolute,
+    hasContainer: state.hasContainer,
+    count: state.count
+  });
+}
+
+// Listen for selection changes and update UI button states
+figma.on('selectionchange', function() {
+  postSelectionState(figma.currentPage.selection);
 });
 
-// Match a node name against a pattern. * is a wildcard that matches any sequence of characters.
-// No wildcard → exact match. Examples: "Section*", "*Nav*", "Tab*Bar".
-function matchesPattern(name, pattern) {
-  if (pattern.indexOf('*') === -1) return name === pattern;
-  var regexStr = pattern
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*/g, '.*');
-  return new RegExp('^' + regexStr + '$').test(name);
+// --- name matching --------------------------------------------------------------
+// Match a node name against a pattern. * is a wildcard that matches any sequence
+// of characters. No wildcard → exact match. Examples: "Section*", "*Nav*", "Tab*Bar".
+//
+// Patterns are compiled once per search (compileNamePatterns), not once per node
+// visited — a search walks every node in scope, and rebuilding a RegExp on every
+// visit is wasted work on a large document.
+function compileNamePatterns(names) {
+  return names.map(function(pattern) {
+    if (pattern.indexOf('*') === -1) {
+      return function(name) { return name === pattern; };
+    }
+    var regexStr = pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '.*');
+    var re = new RegExp('^' + regexStr + '$');
+    return function(name) { return re.test(name); };
+  });
+}
+
+// True when the name matches any of the compiled patterns. No patterns means
+// "no name filter" and matches everything.
+function nameMatches(name, matchers) {
+  if (matchers.length === 0) return true;
+  for (var m = 0; m < matchers.length; m++) {
+    // Return on the first hit so a name repeated in the input can't double-push.
+    if (matchers[m](name)) return true;
+  }
+  return false;
 }
 
 // --- element type filter ----------------------------------------------------
@@ -82,51 +126,56 @@ function searchFilterLabel(typeFilter, visibility) {
   return parts.length > 0 ? ' (' + parts.join(', ') + ')' : '';
 }
 
-// True when the node matches any of the given names. An empty names list means
-// "no name filter" and matches everything.
-function matchesAnyName(node, names) {
-  if (names.length === 0) return true;
-  for (var n = 0; n < names.length; n++) {
-    // Return on the first hit so a name repeated in the input can't double-push.
-    if (matchesPattern(node.name, names[n])) return true;
-  }
-  return false;
-}
-
-// Recursively find children matching any of the given names, the type filter
-// and the visibility filter
-function findByName(container, names, results, typeFilter, visibility) {
+// --- tree walking ----------------------------------------------------------
+// Visit every descendant of container, depth-first. Every recursive search and
+// cleanup below is built on this one traversal, so a fix to how deep a search
+// reaches only ever has to happen in one place.
+function walkTree(container, visit) {
   if (!('children' in container)) return;
   var children = container.children;
   for (var i = 0; i < children.length; i++) {
     var child = children[i];
-    if (matchesAnyName(child, names) && matchesTypeFilter(child, typeFilter) && matchesVisibilityFilter(child, visibility)) {
-      results.push(child);
-    }
-    // Always descend: a filtered-out container can still hold matching children.
-    // A hidden frame can hold layers that are visible in their own right, and a
-    // visible frame can hold hidden ones.
+    visit(child);
     if ('children' in child) {
-      findByName(child, names, results, typeFilter, visibility);
+      walkTree(child, visit);
     }
   }
 }
 
-// Recursively find absolute-positioned children matching any of the given names.
-// If names is empty, collects all absolute elements (no name filter).
-function findAbsoluteByName(container, names, results, typeFilter, visibility) {
-  if (!('children' in container)) return;
-  var children = container.children;
-  for (var i = 0; i < children.length; i++) {
-    var child = children[i];
-    var isAbsolute = 'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE';
-    if (isAbsolute && matchesAnyName(child, names) && matchesTypeFilter(child, typeFilter) && matchesVisibilityFilter(child, visibility)) {
+function isAbsolute(node) {
+  return 'layoutPositioning' in node && node.layoutPositioning === 'ABSOLUTE';
+}
+
+// Find every descendant matching the compiled name patterns, the type filter
+// and the visibility filter.
+function findByName(container, matchers, results, typeFilter, visibility) {
+  walkTree(container, function(child) {
+    if (nameMatches(child.name, matchers) && matchesTypeFilter(child, typeFilter) && matchesVisibilityFilter(child, visibility)) {
       results.push(child);
     }
-    if ('children' in child) {
-      findAbsoluteByName(child, names, results, typeFilter, visibility);
+  });
+}
+
+// Find every absolute-positioned descendant matching the compiled name
+// patterns, the type filter and the visibility filter. Empty matchers means
+// "no name filter" (collects every absolute element in scope).
+function findAbsoluteByName(container, matchers, results, typeFilter, visibility) {
+  walkTree(container, function(child) {
+    if (isAbsolute(child) && nameMatches(child.name, matchers) && matchesTypeFilter(child, typeFilter) && matchesVisibilityFilter(child, visibility)) {
+      results.push(child);
     }
+  });
+}
+
+// --- search scope ------------------------------------------------------------
+// Nothing selected → the whole page is in scope; otherwise the search stays
+// within the current selection. Shared by every action below that needs this.
+function getSearchTargets() {
+  var selection = figma.currentPage.selection;
+  if (selection.length === 0) {
+    return { items: figma.currentPage.children, pageWide: true };
   }
+  return { items: selection, pageWide: false };
 }
 
 // Select a frame by name within selected frames or all page frames
@@ -134,7 +183,6 @@ function findAbsoluteByName(container, names, results, typeFilter, visibility) {
 // typeFilter narrows the matches to components / non-components, visibility
 // narrows them to visible / hidden elements (see above)
 function selectFrameByName(nameInput, typeFilter, visibility) {
-  var selection = figma.currentPage.selection;
   typeFilter = normalizeTypeFilter(typeFilter);
   visibility = normalizeVisibilityFilter(visibility);
 
@@ -146,19 +194,10 @@ function selectFrameByName(nameInput, typeFilter, visibility) {
     return;
   }
 
-  // Determine which frames to search
-  var framesToSearch = [];
-  var searchScope = '';
-
-  if (selection.length === 0) {
-    // No selection: search all frames on the page
-    framesToSearch = figma.currentPage.children;
-    searchScope = 'on page';
-  } else {
-    // Selection exists: search within selected frames
-    framesToSearch = selection;
-    searchScope = 'in selected frames';
-  }
+  var matchers = compileNamePatterns(names);
+  var scope = getSearchTargets();
+  var framesToSearch = scope.items;
+  var searchScope = scope.pageWide ? 'on page' : 'in selected frames';
 
   var foundFrames = [];
 
@@ -166,10 +205,10 @@ function selectFrameByName(nameInput, typeFilter, visibility) {
     var item = framesToSearch[s];
     // Check the item itself — top-level frames are containers to search inside,
     // but they are also valid candidates (e.g. "Section*" matching top-level "Section 2")
-    if (matchesAnyName(item, names) && matchesTypeFilter(item, typeFilter) && matchesVisibilityFilter(item, visibility)) {
+    if (nameMatches(item.name, matchers) && matchesTypeFilter(item, typeFilter) && matchesVisibilityFilter(item, visibility)) {
       foundFrames.push(item);
     }
-    findByName(item, names, foundFrames, typeFilter, visibility);
+    findByName(item, matchers, foundFrames, typeFilter, visibility);
   }
 
   // Create display text for names
@@ -191,36 +230,25 @@ function selectFrameByName(nameInput, typeFilter, visibility) {
 // typeFilter narrows the matches to components / non-components, visibility
 // narrows them to visible / hidden elements (see above)
 function selectAbsoluteByName(nameInput, typeFilter, visibility) {
-  var selection = figma.currentPage.selection;
   typeFilter = normalizeTypeFilter(typeFilter);
   visibility = normalizeVisibilityFilter(visibility);
 
   // Parse comma-separated names — empty input means "select all absolute elements"
   var names = nameInput ? nameInput.split(',').map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; }) : [];
+  var matchers = compileNamePatterns(names);
 
-  // Determine which frames to search
-  var framesToSearch = [];
-  var searchScope = '';
-
-  if (selection.length === 0) {
-    // No selection: search all frames on the page
-    framesToSearch = figma.currentPage.children;
-    searchScope = 'on page';
-  } else {
-    // Selection exists: search within selected frames/sections
-    framesToSearch = selection;
-    searchScope = 'in selected frames';
-  }
+  var scope = getSearchTargets();
+  var framesToSearch = scope.items;
+  var searchScope = scope.pageWide ? 'on page' : 'in selected frames';
 
   var foundFrames = [];
 
   for (var s = 0; s < framesToSearch.length; s++) {
     var item = framesToSearch[s];
-    var itemIsAbsolute = 'layoutPositioning' in item && item.layoutPositioning === 'ABSOLUTE';
-    if (itemIsAbsolute && matchesAnyName(item, names) && matchesTypeFilter(item, typeFilter) && matchesVisibilityFilter(item, visibility)) {
+    if (isAbsolute(item) && nameMatches(item.name, matchers) && matchesTypeFilter(item, typeFilter) && matchesVisibilityFilter(item, visibility)) {
       foundFrames.push(item);
     }
-    findAbsoluteByName(item, names, foundFrames, typeFilter, visibility);
+    findAbsoluteByName(item, matchers, foundFrames, typeFilter, visibility);
   }
 
   var filterLabel = searchFilterLabel(typeFilter, visibility);
@@ -263,9 +291,8 @@ function duplicateSelected() {
 
     if (parent) {
       var isInAutolayout = 'layoutMode' in parent && parent.layoutMode !== 'NONE';
-      var isAbsolute = 'layoutPositioning' in node && node.layoutPositioning === 'ABSOLUTE';
 
-      if (isInAutolayout && !isAbsolute) {
+      if (isInAutolayout && !isAbsolute(node)) {
         // Move clone to right after the original in the autolayout flow
         var nodeIndex = parent.children.indexOf(node);
         parent.insertChild(nodeIndex + 1, dup);
@@ -474,7 +501,7 @@ function alignElements(position, shift) {
     if (!parent) continue;
 
     var nodeIsAutolayout = 'layoutMode' in node && node.layoutMode !== 'NONE';
-    var nodeIsAbsolute = 'layoutPositioning' in node && node.layoutPositioning === 'ABSOLUTE';
+    var nodeIsAbsolute = isAbsolute(node);
     var parentIsAutolayout = 'layoutMode' in parent && parent.layoutMode !== 'NONE';
 
     if (nodeIsAutolayout && (!nodeIsAbsolute || shift)) {
@@ -551,48 +578,35 @@ function alignElements(position, shift) {
   }
 }
 
-// Helper function to remove absolute elements from a container (frame or section)
-function removeAbsoluteFromContainer(container, removed) {
-  if (!('children' in container)) return removed;
+// Remove every absolute-positioned descendant of a container (frame, section,
+// or anything with children). Fully recursive — an absolute element nested any
+// number of levels deep is found, not just direct children or one level into a
+// section's frames. Collects matches first, then removes them, so removal never
+// mutates the array walkTree is iterating.
+function removeAbsoluteFromContainer(container) {
+  var toRemove = [];
+  walkTree(container, function(child) {
+    if (isAbsolute(child)) toRemove.push(child);
+  });
 
-  var children = container.children;
-
-  // Iterate backwards when removing
-  for (var i = children.length - 1; i >= 0; i--) {
-    var child = children[i];
-
-    // If child is a section, recursively search its frames
-    if (child.type === 'SECTION' && 'children' in child) {
-      removed = removeAbsoluteFromContainer(child, removed);
-    }
-    // If child is a frame, search for absolute elements
-    else if ('children' in child) {
-      var frameChildren = child.children;
-      for (var j = frameChildren.length - 1; j >= 0; j--) {
-        var frameChild = frameChildren[j];
-        var isAbsolute = 'layoutPositioning' in frameChild && frameChild.layoutPositioning === 'ABSOLUTE';
-
-        if (isAbsolute) {
-          try {
-            frameChild.remove();
-            removed++;
-          } catch (e) {
-            // ignore individual removal errors
-          }
-        }
-      }
+  var removed = 0;
+  for (var i = 0; i < toRemove.length; i++) {
+    try {
+      toRemove[i].remove();
+      removed++;
+    } catch (e) {
+      // ignore individual removal errors
     }
   }
-
   return removed;
 }
 
 // Delete absolute-positioned components (the "Delete absolute" button)
 // Works in 4 ways:
 // 1. If absolute elements are selected: removes those elements
-// 2. If sections are selected: removes absolute elements from all frames within those sections
-// 3. If frames are selected: removes absolute elements within those frames
-// 4. If nothing is selected: removes all absolute elements from all sections and frames on the page
+// 2. If sections are selected: removes absolute elements from anywhere within those sections
+// 3. If frames are selected: removes absolute elements from anywhere within those frames
+// 4. If nothing is selected: removes every absolute element on the page
 function removeAbsoluteComponents() {
   var selection = figma.currentPage.selection;
   var removed = 0;
@@ -601,9 +615,8 @@ function removeAbsoluteComponents() {
   if (selection.length > 0) {
     var hasAbsoluteElements = false;
 
-    // Check if any selected elements are absolute-positioned
     for (var i = 0; i < selection.length; i++) {
-      if ('layoutPositioning' in selection[i] && selection[i].layoutPositioning === 'ABSOLUTE') {
+      if (isAbsolute(selection[i])) {
         hasAbsoluteElements = true;
         break;
       }
@@ -612,7 +625,7 @@ function removeAbsoluteComponents() {
     if (hasAbsoluteElements) {
       // Remove selected absolute elements directly
       for (var j = selection.length - 1; j >= 0; j--) {
-        if ('layoutPositioning' in selection[j] && selection[j].layoutPositioning === 'ABSOLUTE') {
+        if (isAbsolute(selection[j])) {
           try {
             selection[j].remove();
             removed++;
@@ -632,55 +645,25 @@ function removeAbsoluteComponents() {
   }
 
   // Case 2, 3 & 4: Sections/Frames selected or nothing selected
-  var containersToSearch = [];
-  var searchScope = '';
+  var scope = getSearchTargets();
+  var containersToSearch = scope.items;
+  var searchScope;
 
-  if (selection.length === 0) {
-    // No selection: search all sections and frames on the page
-    containersToSearch = figma.currentPage.children;
+  if (scope.pageWide) {
     searchScope = 'on page';
   } else {
-    // Selection exists: could be sections or frames
-    containersToSearch = selection;
-
-    // Check if any sections are in selection
     var hasSections = false;
-    for (var k = 0; k < selection.length; k++) {
-      if (selection[k].type === 'SECTION') {
+    for (var k = 0; k < containersToSearch.length; k++) {
+      if (containersToSearch[k].type === 'SECTION') {
         hasSections = true;
         break;
       }
     }
-
     searchScope = hasSections ? 'in selected sections' : 'in selected frames';
   }
 
-  // Process each container
   for (var s = 0; s < containersToSearch.length; s++) {
-    var container = containersToSearch[s];
-
-    // If it's a section, use helper to recursively process
-    if (container.type === 'SECTION') {
-      removed = removeAbsoluteFromContainer(container, removed);
-    }
-    // If it's a frame, search its children for absolute elements
-    else if ('children' in container) {
-      var children = container.children;
-
-      for (var m = children.length - 1; m >= 0; m--) {
-        var child = children[m];
-        var isAbsolute = 'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE';
-
-        if (isAbsolute) {
-          try {
-            child.remove();
-            removed++;
-          } catch (e) {
-            // ignore individual removal errors
-          }
-        }
-      }
-    }
+    removed += removeAbsoluteFromContainer(containersToSearch[s]);
   }
 
   if (removed > 0) {
@@ -708,23 +691,9 @@ figma.ui.onmessage = function(msg) {
     alignElements(msg.position, msg.shift);
   } else if (msg.type === 'remove-absolute') {
     removeAbsoluteComponents();
+  } else if (msg.type === 'clear-selection') {
+    figma.currentPage.selection = [];
   } else if (msg.type === 'check-selection') {
-    var sel = figma.currentPage.selection;
-    var hasSelection = sel.length > 0;
-    var hasAbsolute = false;
-    var hasNonAbsolute = false;
-    var hasContainer = false;
-    for (var i = 0; i < sel.length; i++) {
-      var n = sel[i];
-      if ('layoutPositioning' in n && n.layoutPositioning === 'ABSOLUTE') {
-        hasAbsolute = true;
-      } else {
-        hasNonAbsolute = true;
-      }
-      if (n.type === 'FRAME' || n.type === 'SECTION' || n.type === 'COMPONENT' || n.type === 'INSTANCE' || n.type === 'GROUP') {
-        hasContainer = true;
-      }
-    }
-    figma.ui.postMessage({ type: 'selection-change', hasSelection: hasSelection, hasAbsolute: hasAbsolute, hasNonAbsolute: hasNonAbsolute, hasContainer: hasContainer, count: sel.length });
+    postSelectionState(figma.currentPage.selection);
   }
 };
