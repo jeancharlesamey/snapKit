@@ -437,6 +437,13 @@ test('a filled field offers an X that empties it', function() {
   assert.strictEqual(ui.el('frameName').value, '', 'clicking the X should empty the field');
 });
 
+test('clicking the X also clears the canvas selection, not just the field', function() {
+  var ui = loadUi();
+  ui.el('frameName').value = 'Card';
+  ui.click(ui.el('clearName'));
+  assert.deepStrictEqual(ui.lastPosted(), { type: 'clear-selection' }, 'the X should tell the plugin to clear the canvas selection too');
+});
+
 test('the filter trigger keeps its glyph centred and solid', function() {
   var rule = cssRule('.snapkit-filter__button .icon');
   assert.ok(rule && /margin: 0/.test(rule) && /opacity: 1/.test(rule),

@@ -189,6 +189,20 @@ test('check-selection reports absolute / non-absolute / container flags', functi
   assert.strictEqual(msg.hasContainer, false, 'a TEXT node is not a container');
 });
 
+// Regression test: selectionchange used to exclude FRAME/SECTION from
+// hasNonAbsolute while check-selection did not, so "Set to absolute" stayed
+// disabled after selecting a plain (non-absolute) frame via the live event.
+// Both handlers now share computeSelectionState, so they must agree.
+test('selectionchange counts a non-absolute frame as non-absolute, same as check-selection', function() {
+  var frame = mock.makeNode({ name: 'Header', type: 'FRAME' });
+  var screen = mock.makeNode({ name: 'Screen', children: [frame] });
+  var figma = loadPlugin(mock.makeFigma([screen]));
+  figma.currentPage.selection = [frame];
+  figma._messages = [];
+  figma._emit('selectionchange');
+  assert.strictEqual(figma._messages[0].hasNonAbsolute, true, 'a selected non-absolute FRAME should enable "Set to absolute"');
+});
+
 test('align with shift retargets an absolute autolayout frame internal alignment', function() {
   var spec = { name: 'Card', layoutMode: 'VERTICAL', layoutPositioning: 'ABSOLUTE', primaryAxisAlignItems: 'MIN', width: 40, height: 20, x: 0, y: 0, constraints: { horizontal: 'MIN', vertical: 'MIN' }, children: [] };
   var frame = mock.makeNode(spec);
@@ -497,6 +511,44 @@ test('remove-absolute clears all absolute elements page-wide with no selection',
   assert.strictEqual(lastType(msgs), 'success');
   assert.strictEqual(frame.children.length, 1);
   assert.strictEqual(frame.children[0].name, 'B');
+});
+
+// Regression test: removeAbsoluteFromContainer used to only search one level
+// into a selected frame's own children, so an absolute element wrapped in an
+// intermediate frame was silently skipped.
+test('remove-absolute finds an absolute element nested more than one level deep inside a selected frame', function() {
+  var deepAbs = mock.makeNode({ name: 'Fab', layoutPositioning: 'ABSOLUTE' });
+  var wrapper = mock.makeNode({ name: 'Wrapper', children: [deepAbs] });
+  var frame = mock.makeNode({ name: 'Screen', layoutMode: 'VERTICAL', children: [wrapper] });
+  var figma = loadPlugin(mock.makeFigma([frame]));
+  figma.currentPage.selection = [frame];
+  var msgs = figma._send({ type: 'remove-absolute' });
+  assert.strictEqual(lastType(msgs), 'success');
+  assert.strictEqual(wrapper.children.length, 0, 'the absolute element two levels deep should be removed');
+});
+
+// Regression test: removeAbsoluteFromContainer used to only descend
+// section -> frame -> frame's direct children, so an absolute element nested
+// deeper inside a section (e.g. behind an extra wrapper frame) was missed.
+test('remove-absolute finds an absolute element nested deeper than one frame inside a section', function() {
+  var deepAbs = mock.makeNode({ name: 'Fab', layoutPositioning: 'ABSOLUTE' });
+  var wrapper = mock.makeNode({ name: 'Wrapper', children: [deepAbs] });
+  var innerFrame = mock.makeNode({ name: 'Inner', children: [wrapper] });
+  var section = mock.makeNode({ name: 'Sec', type: 'SECTION', children: [innerFrame] });
+  var figma = loadPlugin(mock.makeFigma([section]));
+  figma.currentPage.selection = [];
+  var msgs = figma._send({ type: 'remove-absolute' });
+  assert.strictEqual(lastType(msgs), 'success');
+  assert.strictEqual(wrapper.children.length, 0, 'an absolute element three levels inside a section should be removed');
+});
+
+test('clear-selection empties the canvas selection', function() {
+  var a = mock.makeNode({ name: 'A' });
+  var frame = mock.makeNode({ name: 'Canvas', children: [a] });
+  var figma = loadPlugin(mock.makeFigma([frame]));
+  figma.currentPage.selection = [a];
+  figma._send({ type: 'clear-selection' });
+  assert.strictEqual(figma.currentPage.selection.length, 0);
 });
 
 test('delete-selected removes the selected nodes', function() {

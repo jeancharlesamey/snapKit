@@ -1,6 +1,6 @@
-# SnapKit v1.0.4-alpha
+# SnapKit v1.0.6-alpha
 
-A Figma plugin for finding elements fast and putting them where they belong — search by name, type and visibility, then set absolute positioning, align, duplicate or clean up in one click.
+A Figma plugin for finding elements fast and putting them where they belong / search by name, type and visibility, then set absolute positioning, align, duplicate or clean up in one click, or CMD+SHIFT+R to replace by the copied elements.
 
 **Privacy first**: SnapKit runs entirely inside Figma. Nothing is sent to a server — everything happens locally in the plugin and in your Figma file.
 
@@ -14,7 +14,7 @@ A Figma plugin for finding elements fast and putting them where they belong — 
 
 ## THE PANEL
 
-SnapKit is built with [figma-plugin-ds](https://github.com/thomas-lowry/figma-plugin-ds), so every control — buttons, the search field, the radios, the type menu, the icons — is the one Figma uses itself. The library is vendored in the repo (see [Development](#development)); nothing is fetched from the network.
+SnapKit is built with [`plugin-ds-skill`](https://github.com/jeancharlesamey/plugin-ds-skill), so every control — buttons, the search field, the radios, the type menu, the icons — is the one Figma uses itself. The library is vendored in the repo (see [Development](#development)); nothing is fetched from the network.
 
 The panel is split into two titled sections so searching never gets mixed up with changing the document:
 
@@ -79,7 +79,7 @@ Leave the name field empty, pick **Hidden** and press **Select absolute** to gra
 ### Search feedback
 While a search runs, the loader spells out what is actually being looked for, so a surprising result is easy to explain:
 
-> *Searching for absolute elements named “Header” — components only — hidden elements only — inside the current selection*
+> *Searching for absolute elements named “Header” / components only / hidden elements only / inside the current selection*
 
 It names the element kind (all elements vs absolute only, from the button you pressed), the name(s) typed (or *with any name* when the field is empty), the type filter, the visibility filter and the scope. A long search cycles through progress messages and, after a while, offers a **Stop the selection** button. The result message repeats the active filters too.
 
@@ -208,7 +208,26 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 
 ## RELEASE NOTES
 
-### v1.0.4-alpha (in development)
+### v1.0.6-alpha
+**Improvements:**
+- Wildcard name patterns are now compiled once per search instead of rebuilding a `RegExp` on every node visited — cuts redundant work on large documents
+- `findByName` / `findAbsoluteByName` merged into a single recursive tree walk (`walkTree`), removing duplicated traversal logic
+- The "which frames to search" resolution (page-wide vs. current selection) is now one shared helper instead of three separate copies
+- Fixed a drift bug between the live `selectionchange` event and the `check-selection` request: they used to disagree on what counted as "non-absolute", which could leave *Set to absolute* incorrectly disabled after selecting a plain frame. Both now share one `computeSelectionState` function
+- Fixed a latent bug in **Delete absolute**: it only searched one level into a selected frame's children, and two levels into a selected section (section → frame → child) — an absolute element nested any deeper was silently skipped. Cleanup is now fully recursive, matching how search already worked
+- Added 6 regression tests covering all three fixes; the suite is now 90 tests (48 plugin + 42 UI), all passing
+
+**UI Changes:**
+- Search overlay scrim: white → dark (`--black8`, the dark counterpart of the same 80%-opacity token)
+- Search overlay text (context line and the cycling status messages): now white, for contrast against the dark scrim
+- Loader spinner: recoloured blue → white, and doubled in size
+- The **✕** in the search field now also clears the canvas selection, not just the field — it means "start this search over", and a stale selection would otherwise silently narrow the next search to "in selected frames" instead of the whole page. Typing a new search and pressing Select/Select absolute is unaffected, since that already replaces the canvas selection on its own
+
+### v1.0.5-alpha
+**UI Changes:**
+- Refactored the plugin-ds integration using the [`plugin-ds-skill`](https://github.com/jeancharlesamey/plugin-ds-skill) tool
+
+### v1.0.4-alpha
 **UI Changes:**
 - The magnifier in the search field is now the same grey as the placeholder text next to it. It carried an extra `icon--black3` tint on top of the design system's own 30% opacity, which washed it out — a plain black glyph at that opacity is the placeholder colour exactly
 
@@ -216,7 +235,7 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 - Every local change to a figma-plugin-ds control moved into its own stylesheet, **`ui/ds-overrides.css`**, inlined between the vendored design system and SnapKit's own styles. `ui/snapkit.css` is now layout and the components the DS has no equivalent for, and never styles a DS class. Updating the design system is still a single file drop, and now has exactly one file to re-check afterwards — a test enforces the split and that the vendored copy stays unpatched
 - Fixed an unterminated comment in the SnapKit stylesheet that was swallowing the `.input__field` rule, so the search field only now actually gets the button corner radius and the icon-button height it was meant to have
 
-### v1.0.3-alpha (July 28, 2026)
+### v1.0.3-alpha
 **New Features:**
 - Visibility filter (issue #5, part 3): a Visible / Hidden / All radio group on one line under the name field narrows any search to what is shown or what is hidden. *Hidden* means the layer's own visibility is off — opacity 0 and hidden parents are explicitly not counted. It applies to both Select and Select absolute, combines with the name and type filters, and an empty name field means "everything hidden in scope".
 
@@ -231,14 +250,14 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 - README rewritten around the two panel sections, with the search filters documented together, a recipes section, and previously undocumented behaviour written down (Shift-click alignment on absolute autolayout frames, the loader's Stop button, where version numbers live)
 - Development section documents the new `ui/` layout, the vendored design system and the `npm run build:ui` step
 
-### v1.0.2-alpha (July 27, 2026)
+### v1.0.2-alpha
 **New Features:**
 - Explicit search context in the loader (part of issue #5): the spinner now carries a line describing the search in progress — element kind (all vs absolute only, from the button used), the name(s) typed (or "with any name" when the field is empty), the active element type filter and the scope (current selection vs whole page)
 
 **UI Changes:**
 - The "a filter is applied" dot on the filter icon is now red and larger (11px), so a narrowed search is impossible to miss
 
-### v1.0.1-alpha (July 27, 2026)
+### v1.0.1-alpha
 **New Features:**
 - Added element type filter for name searches (issue #2, and part 1 of issue #5): a filter icon next to the name field opens a popover with All types (default) / Components only / Everything but components. Applies to both Select and Select Absolute; the active filter shows as a dot on the icon and is named in the result message.
 
@@ -250,7 +269,7 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
   - "Remove absolute" is disabled when the selection contains no absolute elements and no frames/sections
   - "Remove absolute" stays accessible with no selection (whole-page mode) or when frames/sections are selected
 
-### v0.0.4-alpha (April 30, 2026)
+### v0.0.4-alpha
 **Improvements:**
 - Improved: Alignment buttons are now context-aware — no longer forces elements to absolute positioning
   - Autolayout frames: updates `primaryAxisAlignItems` / `counterAxisAlignItems`
@@ -264,12 +283,12 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 - Fixed: Four `var i` redeclarations in Remove Absolute function (linter warnings)
 - Fixed: Misleading code comment on name-deduplication break statement
 
-### v0.0.3-alpha (February 5, 2026)
+### v0.0.3-alpha
 **Improvements:**
 - Renamed plugin from "PrototypFix" to "SnapKit"
-- Added dynamic button states—buttons now show grey when no elements are selected
-- Added automatic selection change detection—UI updates instantly when you change selection in Figma
-- Improved: Remove Absolute now supports Figma sections—searches all frames within selected sections
+- Added dynamic button states — buttons now show grey when no elements are selected
+- Added automatic selection change detection — UI updates instantly when you change selection in Figma
+- Improved: Remove Absolute now supports Figma sections — searches all frames within selected sections
 - Improved: Remove Absolute with no selection now searches through all sections and frames on the page
 
 **Fixes:**
@@ -279,7 +298,7 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 **UI Changes:**
 - Removed plugin header/title from UI window for cleaner interface
 
-### v0.0.2-alpha (February 4, 2026)
+### v0.0.2-alpha
 **New Features:**
 - Added multi-component selection: search for multiple components using comma-separated names
 - Added "Select Absolute" button: find only absolute-positioned components by name
@@ -297,7 +316,7 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 
 **Changes:**
 - Removed "Select Header" button (use "Select Component" with "Header" name instead)
-- Disabled "Set Fixed Scroll" button (Figma API limitations—shown with tooltip)
+- Disabled "Set Fixed Scroll" button (Figma API limitations — shown with tooltip)
 - Button text now uses sentence case (only first letter capitalized)
 
 **Documentation:**
@@ -308,8 +327,8 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 
 ## SUPPORT
 
-For issues or feedback, please contact the plugin maintainer via github.
+For issues or feedback, please contact the plugin maintainer via GitHub.
 
 ---
 
-**Current Version**: v1.0.4-alpha (in development)
+**Current Version**: v1.0.6-alpha
