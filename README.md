@@ -5,6 +5,17 @@ A Figma plugin for finding elements fast and putting them where they belong / se
 **Privacy first**: SnapKit runs entirely inside Figma. Nothing is sent to a server — everything happens locally in the plugin and in your Figma file.
 
 
+## Contents
+- [Installation](#installation)
+- [The panel](#the-panel)
+- [Selection](#selection)
+- [Actions](#actions)
+- [Recipes](#recipes)
+- [Tips](#tips)
+- [Release notes](#release-notes)
+- [Support](#support)
+
+
 ## INSTALLATION
 
 1. In Figma, go to **Plugins** → **Development** → **Import plugin from manifest**
@@ -14,7 +25,7 @@ A Figma plugin for finding elements fast and putting them where they belong / se
 
 ## THE PANEL
 
-SnapKit is built with [`plugin-ds-skill`](https://github.com/jeancharlesamey/plugin-ds-skill), so every control — buttons, the search field, the radios, the type menu, the icons — is the one Figma uses itself. The library is vendored in the repo (see [Development](#development)); nothing is fetched from the network.
+SnapKit is built with [plugin-ds-skill](https://github.com/jeancharlesamey/plugin-ds-skill), so every control — buttons, the search field, the radios, the type menu, the icons — is the one Figma uses itself. The library is vendored in the repo; nothing is fetched from the network.
 
 The panel is split into two titled sections so searching never gets mixed up with changing the document:
 
@@ -149,61 +160,6 @@ Buttons enable and disable themselves as your selection changes: *Set to absolut
 - **Read the loader** — if a search returns something unexpected, the line under the spinner says exactly what SnapKit looked for
 - **Empty name is a feature** — with *Select absolute* or a *Hidden* search it means "everything in scope"
 - **Sections are supported** — searches and *Delete absolute* both walk into sections
-
-
-## DEVELOPMENT
-
-### Layout
-
-```
-code.js                                    the Figma main thread
-manifest.json                              points at code.js and ui.html
-ui.html                                    GENERATED — do not edit
-scripts/build-ui.js                        builds ui.html from ui/
-ui/
-  index.html                               the panel markup
-  ds-overrides.css                         the only local changes to the DS
-  snapkit.css                              layout + SnapKit's own components
-  snapkit.js                               the panel behaviour
-  vendor/figma-plugin-ds/                  the design system, vendored (MIT)
-test/                                      the test suite
-```
-
-### The design system
-
-The UI uses **[figma-plugin-ds](https://github.com/thomas-lowry/figma-plugin-ds)** by Tom Lowry, a CSS library that reproduces Figma's own controls. Its stylesheet is **copied into `ui/vendor/figma-plugin-ds/`** rather than installed: SnapKit has no `npm install` step, and a plugin iframe cannot resolve a remote or relative stylesheet anyway. `ui/vendor/figma-plugin-ds/README.md` records the version and how to update it — drop in the new file, run `npm run build:ui`.
-
-The overrides are kept apart from the rest of the CSS so an upstream release cannot quietly break the panel:
-
-- **`ui/ds-overrides.css`** is the only file that styles a DS class, and the vendored copy is never patched. It is inlined right after the design system, so at equal specificity it wins on source order. When the DS is updated, this is the one file to re-read
-- **`ui/snapkit.css`** is layout plus the components the DS has no equivalent for (the toast, the search overlay, the field's clear button). It may lean on a DS class to *find* an element, but every property it sets lands on a `.snapkit-*` element of our own
-
-`test/ui.test.js` enforces both halves of that split, so a DS override added to the wrong file fails the suite. New controls should reach for a DS class first.
-
-### The build step
-
-Figma serves the plugin UI from a sandboxed iframe with no document base, so `ui.html` has to be one self-contained file. `scripts/build-ui.js` inlines the stylesheets and the script from `ui/`, and strips the design system's remote Inter `@font-face` rules so the panel never touches the network.
-
-```
-npm run build:ui
-```
-
-`ui.html` is committed so the plugin can be imported straight from the manifest. `npm test` fails if it is out of date.
-
-### Tests
-
-The plugin runs inside Figma, but its logic is covered by a dependency-free test suite that mocks the Figma plugin API:
-
-- `test/plugin.test.js` — every UI message handler (select, select absolute, duplicate, set to absolute, align, delete absolute, delete), including the type and visibility filters
-- `test/ui.test.js` — reads the built `ui.html` and runs its inline script against a small DOM stub, covering the type filter menu, the visibility radio group, the Selection / Actions sections, the selection count and the field's clear button, the loader overlay and its search-context line, the context-aware button states, that the DS overrides stay in their own stylesheet, and that nothing in the panel is loaded from the network
-
-```
-npm test
-```
-
-No `npm install` needed — everything uses Node built-ins only.
-
-Version numbers live in `README.md` (title, release notes, footer), `package.json`, the header comment of `code.js`, and the `name` field of `manifest.json`. The manifest `id` is deliberately left alone: Figma treats it as the plugin's identity.
 
 
 ## RELEASE NOTES
