@@ -46,18 +46,62 @@ function assertSelection(figma, expected) {
   }
 }
 
+// replace-all is the plugin's first async action (it awaits figma.loadFontAsync
+// before editing text content), so its tests need to wait past every pending
+// .then() before asserting. setImmediate runs after all queued microtasks, so
+// it's a safe point to check the result regardless of how many .then() hops
+// the promise chain under test takes.
+function afterAsync(fn) {
+  return new Promise(function(resolve) {
+    setImmediate(function() {
+      fn();
+      resolve();
+    });
+  });
+}
+
 // --- tiny test runner -------------------------------------------------------
+// Tests queue instead of running immediately, since replace-all is the first
+// async action in the plugin (it has to await figma.loadFontAsync before
+// editing text content) — a test for it has to await the result too, and
+// process.exit() must not fire until every queued test has actually settled.
 var passed = 0;
 var failed = 0;
+var queued = [];
 function test(name, fn) {
-  try {
-    fn();
-    passed++;
-    console.log('  ✓ ' + name);
-  } catch (e) {
+  queued.push({ name: name, fn: fn });
+}
+
+function runNext(i) {
+  if (i >= queued.length) {
+    console.log('\n' + passed + ' passed, ' + failed + ' failed');
+    process.exit(failed === 0 ? 0 : 1);
+    return;
+  }
+  var t = queued[i];
+  function onFail(e) {
     failed++;
-    console.log('  ✗ ' + name);
+    console.log('  ✗ ' + t.name);
     console.log('      ' + (e && e.message ? e.message : e));
+    runNext(i + 1);
+  }
+  var result;
+  try {
+    result = t.fn();
+  } catch (e) {
+    onFail(e);
+    return;
+  }
+  if (result && typeof result.then === 'function') {
+    result.then(function() {
+      passed++;
+      console.log('  ✓ ' + t.name);
+      runNext(i + 1);
+    }, onFail);
+  } else {
+    passed++;
+    console.log('  ✓ ' + t.name);
+    runNext(i + 1);
   }
 }
 
@@ -551,6 +595,161 @@ test('clear-selection empties the canvas selection', function() {
   assert.strictEqual(figma.currentPage.selection.length, 0);
 });
 
+test('resize asks Figma to resize the window to the height the UI measured, keeping the width fixed', function() {
+  var figma = loadPlugin(mock.makeFigma([]));
+  figma._send({ type: 'resize', height: 462 });
+  assert.deepStrictEqual(figma._resized, { width: 320, height: 462 });
+});
+
+// --- replace-all (the Replace filter option) ---------------------------------
+
+test('replace-all replaces matching text content, case-insensitively', function() {
+  var text = mock.makeNode({ name: 'Label', type: 'TEXT', characters: 'Hello WORLD', fontName: { family: 'Inter', style: 'Regular' } });
+  var frame = mock.makeNode({ name: 'Screen', children: [text] });
+  var figma = loadPlugin(mock.makeFigma([frame]));
+  figma._send({ type: 'replace-all', name: 'world', replaceWith: 'Figma' });
+  return afterAsync(function() {
+    assert.strictEqual(lastType(figma._messages), 'success');
+    assert.strictEqual(text.characters, 'Hello Figma');
+  });
+});
+
+test('replace-all replaces a matching layer name, not just text content', function() {
+  var header = mock.makeNode({ name: 'Header', type: 'FRAME' });
+  var frame = mock.makeNode({ name: 'Screen', children: [header] });
+  var figma = loadPlugin(mock.makeFigma([frame]));
+  figma._send({ type: 'replace-all', name: 'Header', replaceWith: 'Banner' });
+  return afterAsync(function() {
+    assert.strictEqual(lastType(figma._messages), 'success');
+    assert.strictEqual(header.name, 'Banner');
+  });
+});
+
+test('replace-all replaces both the name and the content when both match on the same node', function() {
+  var text = mock.makeNode({ name: 'Header', type: 'TEXT', characters: 'Header text', fontName: { family: 'Inter', style: 'Regular' } });
+  var frame = mock.makeNode({ name: 'Screen', children: [text] });
+  var figma = loadPlugin(mock.makeFigma([frame]));
+  figma._send({ type: 'replace-all', name: 'Header', replaceWith: 'Title' });
+  return afterAsync(function() {
+    assert.strictEqual(text.name, 'Title');
+    assert.strictEqual(text.characters, 'Title text');
+  });
+});
+
+test('replace-all replaces every occurrence within a single string and counts them', function() {
+  var text = mock.makeNode({ name: 'Repeats', type: 'TEXT', characters: 'cat cat cat', fontName: { family: 'Inter', style: 'Regular' } });
+  var frame = mock.makeNode({ name: 'Screen', children: [text] });
+  var figma = loadPlugin(mock.makeFigma([frame]));
+  figma._send({ type: 'replace-all', name: 'cat', replaceWith: 'dog' });
+  return afterAsync(function() {
+    assert.strictEqual(text.characters, 'dog dog dog');
+    assert.ok(/Replaced 3 occurrence/.test(lastText(figma._messages)), 'should report 3 occurrences: ' + lastText(figma._messages));
+  });
+});
+
+test('replace-all is scoped to the current selection, not the whole page', function() {
+  var insideText = mock.makeNode({ name: 'Inside', type: 'TEXT', characters: 'find me', fontName: { family: 'Inter', style: 'Regular' } });
+  var selectedFrame = mock.makeNode({ name: 'Selected', children: [insideText] });
+  var outsideText = mock.makeNode({ name: 'Outside', type: 'TEXT', characters: 'find me', fontName: { family: 'Inter', style: 'Regular' } });
+  var otherFrame = mock.makeNode({ name: 'Other', children: [outsideText] });
+  var figma = loadPlugin(mock.makeFigma([selectedFrame, otherFrame]));
+  figma.currentPage.selection = [selectedFrame];
+  figma._send({ type: 'replace-all', name: 'find me', replaceWith: 'found' });
+  return afterAsync(function() {
+    assert.strictEqual(insideText.characters, 'found', 'the match inside the selection should be replaced');
+    assert.strictEqual(outsideText.characters, 'find me', 'the match outside the selection should be untouched');
+  });
+});
+
+// Regression test: one match failing to load its font (deleted/unavailable
+// font — a common real Figma situation) used to abort every match queued
+// after it and report a bare "Could not complete the replace", discarding the
+// ones that had already succeeded. Matches now run independently.
+test('replace-all keeps going when one match cannot load its font, and reports it honestly', function() {
+  var before = mock.makeNode({ name: 'Before', type: 'TEXT', characters: 'BIOMÉTRIE', fontName: { family: 'Inter', style: 'Regular' } });
+  var broken = mock.makeNode({ name: 'Broken', type: 'TEXT', characters: 'BIOMÉTRIE', fontName: { family: '__MISSING_FONT__', style: 'Regular' } });
+  var after = mock.makeNode({ name: 'After', type: 'TEXT', characters: 'BIOMÉTRIE', fontName: { family: 'Inter', style: 'Regular' } });
+  var frame = mock.makeNode({ name: 'Screen', children: [before, broken, after] });
+  var figma = loadPlugin(mock.makeFigma([frame]));
+  figma._send({ type: 'replace-all', name: 'BIOMÉTRIE', replaceWith: 'Biométrie' });
+  return afterAsync(function() {
+    assert.strictEqual(lastType(figma._messages), 'success', 'the whole run should not be reported as a failure');
+    assert.strictEqual(before.characters, 'Biométrie', 'the match before the broken one should still be replaced');
+    assert.strictEqual(after.characters, 'Biométrie', 'the match after the broken one should still be replaced — not skipped');
+    assert.strictEqual(broken.characters, 'BIOMÉTRIE', 'the one that could not load its font is left untouched, not corrupted');
+    assert.ok(/could not be updated/.test(lastText(figma._messages)), 'should say one element could not be updated: ' + lastText(figma._messages));
+  });
+});
+
+test('replace-all reports an error and changes nothing when there are no matches', function() {
+  var text = mock.makeNode({ name: 'Label', type: 'TEXT', characters: 'Hello world', fontName: { family: 'Inter', style: 'Regular' } });
+  var frame = mock.makeNode({ name: 'Screen', children: [text] });
+  var figma = loadPlugin(mock.makeFigma([frame]));
+  var msgs = figma._send({ type: 'replace-all', name: 'Nope', replaceWith: 'x' });
+  assert.strictEqual(lastType(msgs), 'error');
+  assert.strictEqual(text.characters, 'Hello world');
+});
+
+test('replace-all requires non-empty text to find', function() {
+  var figma = loadPlugin(mock.makeFigma([]));
+  var msgs = figma._send({ type: 'replace-all', name: '', replaceWith: 'x' });
+  assert.strictEqual(lastType(msgs), 'error');
+});
+
+// --- replace scope: everywhere / structure (frames+sections) / text --------
+
+test('replace-all scope "structure" only renames FRAME/SECTION names, ignoring text content and other types', function() {
+  var frame = mock.makeNode({ name: 'Header', type: 'FRAME' });
+  var section = mock.makeNode({ name: 'Header', type: 'SECTION', children: [] });
+  var comp = mock.makeNode({ name: 'Header', type: 'COMPONENT' });
+  var text = mock.makeNode({ name: 'Header', type: 'TEXT', characters: 'Header', fontName: { family: 'Inter', style: 'Regular' } });
+  var page = mock.makeNode({ name: 'Page', children: [frame, section, comp, text] });
+  var figma = loadPlugin(mock.makeFigma([page]));
+  figma._send({ type: 'replace-all', name: 'Header', replaceWith: 'Banner', scope: 'structure' });
+  return afterAsync(function() {
+    assert.strictEqual(frame.name, 'Banner', 'a FRAME name should be renamed');
+    assert.strictEqual(section.name, 'Banner', 'a SECTION name should be renamed');
+    assert.strictEqual(comp.name, 'Header', 'a COMPONENT name should be left alone — not a frame or section');
+    assert.strictEqual(text.name, 'Header', 'a TEXT node\'s own name should be left alone in structure scope');
+    assert.strictEqual(text.characters, 'Header', 'text content should be untouched in structure scope');
+  });
+});
+
+test('replace-all scope "text" only rewrites TEXT content, ignoring every name', function() {
+  var text = mock.makeNode({ name: 'Header', type: 'TEXT', characters: 'Header', fontName: { family: 'Inter', style: 'Regular' } });
+  var frame = mock.makeNode({ name: 'Header', type: 'FRAME' });
+  var page = mock.makeNode({ name: 'Page', children: [text, frame] });
+  var figma = loadPlugin(mock.makeFigma([page]));
+  figma._send({ type: 'replace-all', name: 'Header', replaceWith: 'Banner', scope: 'text' });
+  return afterAsync(function() {
+    assert.strictEqual(text.characters, 'Banner', 'the text content should be rewritten');
+    assert.strictEqual(text.name, 'Header', 'the TEXT node\'s own name should be left alone in text scope');
+    assert.strictEqual(frame.name, 'Header', 'a FRAME name should be left alone in text scope');
+  });
+});
+
+test('replace-all with no scope (or an unknown one) falls back to everywhere', function() {
+  var text = mock.makeNode({ name: 'Header', type: 'TEXT', characters: 'Header', fontName: { family: 'Inter', style: 'Regular' } });
+  var frame = mock.makeNode({ name: 'Header', type: 'FRAME' });
+  var page = mock.makeNode({ name: 'Page', children: [text, frame] });
+  var figma = loadPlugin(mock.makeFigma([page]));
+  figma._send({ type: 'replace-all', name: 'Header', replaceWith: 'Banner', scope: 'nonsense' });
+  return afterAsync(function() {
+    assert.strictEqual(text.characters, 'Banner');
+    assert.strictEqual(frame.name, 'Banner');
+  });
+});
+
+test('replace-all names the active scope in the result message', function() {
+  var frame = mock.makeNode({ name: 'Header', type: 'FRAME' });
+  var page = mock.makeNode({ name: 'Page', children: [frame] });
+  var figma = loadPlugin(mock.makeFigma([page]));
+  figma._send({ type: 'replace-all', name: 'Header', replaceWith: 'Banner', scope: 'structure' });
+  return afterAsync(function() {
+    assert.ok(/in section and frames only/.test(lastText(figma._messages)), 'should name the scope: ' + lastText(figma._messages));
+  });
+});
+
 test('delete-selected removes the selected nodes', function() {
   var a = mock.makeNode({ name: 'A' });
   var b = mock.makeNode({ name: 'B' });
@@ -572,5 +771,4 @@ test('actions on an empty selection return a helpful error', function() {
   });
 });
 
-console.log('\n' + passed + ' passed, ' + failed + ' failed');
-process.exit(failed === 0 ? 0 : 1);
+runNext(0);

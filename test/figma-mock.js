@@ -32,6 +32,16 @@ function makeNode(spec) {
   if ('primaryAxisAlignItems' in spec) node.primaryAxisAlignItems = spec.primaryAxisAlignItems;
   if ('counterAxisAlignItems' in spec) node.counterAxisAlignItems = spec.counterAxisAlignItems;
   if ('numberOfFixedChildren' in spec) node.numberOfFixedChildren = spec.numberOfFixedChildren;
+  if ('characters' in spec) node.characters = spec.characters;
+  if ('fontName' in spec) node.fontName = spec.fontName;
+
+  // Real TextNodes can mix fonts across a single string; the real API asks you
+  // to load every font used in a range before editing it. This mock doesn't
+  // model per-character font runs, so it just reports the node's one fontName —
+  // enough to exercise the "load before you touch .characters" contract.
+  if ('characters' in spec) {
+    node.getRangeAllFontNames = function() { return [node.fontName]; };
+  }
 
   // Every scene node can be cloned and removed.
   node.clone = function() {
@@ -87,6 +97,16 @@ function makeFigma(pageChildren) {
       scrollAndZoomIntoView: function() {}
     },
     showUI: function() {},
+    // Real Figma resolves this once the font is actually loaded, and rejects
+    // for a font it can't find (deleted, or never installed). The mock
+    // resolves immediately for anything else, but rejects for this one
+    // reserved family name so tests can reproduce that failure on demand.
+    loadFontAsync: function(fontName) {
+      if (fontName && fontName.family === '__MISSING_FONT__') {
+        return Promise.reject(new Error('Cannot find font "' + fontName.family + '"'));
+      }
+      return Promise.resolve();
+    },
     on: function(event, cb) {
       listeners[event] = listeners[event] || [];
       listeners[event].push(cb);
@@ -97,7 +117,8 @@ function makeFigma(pageChildren) {
     ui: {
       postMessage: function(msg) { figma._messages.push(msg); },
       set onmessage(fn) { figma._ui.handler = fn; },
-      get onmessage() { return figma._ui.handler; }
+      get onmessage() { return figma._ui.handler; },
+      resize: function(width, height) { figma._resized = { width: width, height: height }; }
     },
     // Convenience: deliver a message from the UI to the plugin.
     _send: function(msg) {

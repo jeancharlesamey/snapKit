@@ -50,7 +50,7 @@ function cssRule(selector) {
 
 // --- minimal DOM stub -------------------------------------------------------
 // Only what the UI script touches: getElementById, querySelectorAll, classList,
-// getAttribute, onclick, offsetWidth and parent.postMessage.
+// getAttribute, onclick, offsetWidth, scrollHeight and parent.postMessage.
 function makeElement(id, attrs) {
   attrs = attrs || {};
   var classes = (attrs['class'] || '').split(' ').filter(Boolean);
@@ -60,8 +60,12 @@ function makeElement(id, attrs) {
     disabled: false,
     value: '',
     title: attrs.title || '',
+    placeholder: attrs.placeholder || '',
     textContent: '',
     offsetWidth: 0,
+    // Real layout height of the page; the stub can't compute this, so tests
+    // that care set it directly (document.body.scrollHeight = ...).
+    scrollHeight: 0,
     className: classes.join(' '),
     _attrs: attrs,
     classList: {
@@ -136,6 +140,10 @@ function loadUi() {
     window: {},
     parent: { postMessage: function(msg) { posted.push(msg.pluginMessage); } },
     setTimeout: function() {},
+    // Unlike setTimeout above (deliberately inert, so the toast's auto-hide
+    // never fires mid-test), this runs its callback right away — the resize
+    // behavior it defers is exactly what's under test here.
+    requestAnimationFrame: function(cb) { cb(); },
     console: console
   };
   vm.createContext(ctx);
@@ -163,6 +171,7 @@ function loadUi() {
     posted: posted,
     // Objects built inside the vm have a foreign prototype, so compare as JSON.
     lastPosted: function() { return posted.length ? JSON.parse(JSON.stringify(posted[posted.length - 1])) : null; },
+    firstPosted: function() { return posted.length ? JSON.parse(JSON.stringify(posted[0])) : null; },
     send: function(msg) { ctx.window.onmessage({ data: { pluginMessage: msg } }); }
   };
 }
@@ -186,7 +195,17 @@ console.log('SnapKit UI tests\n');
 
 test('the UI script loads and asks for the current selection on startup', function() {
   var ui = loadUi();
-  assert.deepStrictEqual(ui.lastPosted(), { type: 'check-selection' });
+  // check-selection is the first thing posted on load — it's no longer the
+  // last, since setting the initial type filter now also measures and posts
+  // a resize.
+  assert.deepStrictEqual(ui.firstPosted(), { type: 'check-selection' });
+});
+
+test('the UI also resizes the window to fit its content on load', function() {
+  var ui = loadUi();
+  var resizeMsgs = ui.posted.filter(function(m) { return m.type === 'resize'; });
+  assert.strictEqual(resizeMsgs.length, 1, 'should resize exactly once on load');
+  assert.strictEqual(typeof resizeMsgs[0].height, 'number');
 });
 
 test('the filter menu offers exactly the three known element types', function() {
@@ -234,6 +253,142 @@ test('going back to All types clears the active dot', function() {
   assert.ok(ui.el('filterBtn').classList.contains('is-active'));
   ui.click(ui.option('all'));
   assert.ok(!ui.el('filterBtn').classList.contains('is-active'), 'the dot should clear on the default filter');
+});
+
+test('the Replace toggle reveals the replace row, and turning it off hides it again', function() {
+  var ui = loadUi();
+  assert.ok(!ui.el('replaceRow').classList.contains('is-visible'), 'hidden until Replace is toggled on');
+  assert.strictEqual(ui.el('replaceToggleBtn').textContent, 'Replace');
+  ui.click(ui.el('replaceToggleBtn'));
+  assert.ok(ui.el('replaceRow').classList.contains('is-visible'), 'the replace field and button should appear');
+  assert.ok(ui.el('replaceToggleBtn').classList.contains('is-active'), 'the toggle itself should show as active');
+  assert.strictEqual(ui.el('replaceToggleBtn').textContent, 'Replace ✕', 'the label should show a way to close it');
+  ui.click(ui.el('replaceToggleBtn'));
+  assert.ok(!ui.el('replaceRow').classList.contains('is-visible'), 'it should hide again once Replace is toggled off');
+  assert.ok(!ui.el('replaceToggleBtn').classList.contains('is-active'), 'the toggle should no longer show as active');
+  assert.strictEqual(ui.el('replaceToggleBtn').textContent, 'Replace', 'the ✕ should go away once it is turned back off');
+});
+
+test('the Replace toggle is black with no underline at rest, not the tertiary button\'s usual blue link style', function() {
+  var ui = loadUi();
+  // .snapkit-replace-toggle and its :enabled:focus variant share one rule
+  // block in the source, so either selector string reaches the same
+  // declarations — this checks it through the more specific one.
+  var baseRule = cssRule('.snapkit-replace-toggle:enabled:focus');
+  assert.ok(baseRule && /color: var\(--black8\)/.test(baseRule), 'should override the DS blue at rest, not just when active: ' + baseRule);
+  assert.ok(baseRule && /text-decoration: none/.test(baseRule), 'should override the DS focus underline: ' + baseRule);
+});
+
+test('the Replace toggle only goes bold when active — the black color already applies at rest', function() {
+  var ui = loadUi();
+  var activeRule = cssRule('.snapkit-replace-toggle.is-active');
+  assert.ok(activeRule && /font-weight: var\(--font-weight-bold\)/.test(activeRule), 'should be bold when active: ' + activeRule);
+  assert.ok(activeRule && !/color/.test(activeRule), 'color shouldn\'t need to be repeated here: ' + activeRule);
+});
+
+test('the dropdown relabels itself for Replace mode, and reverts when Replace is turned off', function() {
+  var ui = loadUi();
+  assert.strictEqual(ui.el('filterLabelAll').textContent, 'All types');
+  assert.strictEqual(ui.el('filterLabelComponent').textContent, 'Components only');
+  assert.strictEqual(ui.el('filterLabelNonComponent').textContent, 'Everything but components');
+  assert.strictEqual(ui.el('filterDividerLabel').textContent, 'Selection scope');
+
+  ui.click(ui.el('replaceToggleBtn'));
+  assert.strictEqual(ui.el('filterLabelAll').textContent, 'Everywhere');
+  assert.strictEqual(ui.el('filterLabelComponent').textContent, 'In section and frames only');
+  assert.strictEqual(ui.el('filterLabelNonComponent').textContent, 'In text only');
+  assert.strictEqual(ui.el('filterDividerLabel').textContent, 'Replace scope');
+
+  ui.click(ui.el('replaceToggleBtn'));
+  assert.strictEqual(ui.el('filterLabelAll').textContent, 'All types', 'labels should revert once Replace is off');
+  assert.strictEqual(ui.el('filterDividerLabel').textContent, 'Selection scope');
+});
+
+test('picking a dropdown option in Replace mode sets the replace scope, not the element-type filter — and does not turn Replace off', function() {
+  var ui = loadUi();
+  ui.click(ui.el('replaceToggleBtn'));
+  ui.click(ui.option('component'));
+  assert.ok(ui.el('replaceRow').classList.contains('is-visible'), 'picking a scope should not turn Replace off');
+  assert.ok(ui.option('component').classList.contains('select-menu__item--selected'), 'the chosen scope should show as selected');
+
+  ui.el('frameName').value = 'Header';
+  ui.el('replaceWith').value = 'Banner';
+  ui.click(ui.el('replaceAllBtn'));
+  assert.deepStrictEqual(ui.lastPosted(), { type: 'replace-all', name: 'Header', replaceWith: 'Banner', visibility: 'all', scope: 'structure' }, 'the "Components only" slot means the structure scope in Replace mode');
+});
+
+test('the type filter is untouched by picking a replace scope, and comes back once Replace is off', function() {
+  var ui = loadUi();
+  ui.click(ui.option('non-component'));
+  ui.click(ui.el('replaceToggleBtn'));
+  ui.click(ui.option('all')); // "Everywhere" slot, while in Replace mode
+  ui.click(ui.el('replaceToggleBtn'));
+  assert.ok(ui.option('non-component').classList.contains('select-menu__item--selected'), 'the original type filter should still be selected, unaffected by the scope picked in Replace mode');
+});
+
+test('clicking an already-checked replace scope toggles it off, back to Everywhere', function() {
+  var ui = loadUi();
+  ui.click(ui.el('replaceToggleBtn'));
+  ui.click(ui.option('non-component')); // "In text only"
+  assert.ok(ui.el('filterBtn').classList.contains('is-active'), 'a narrowed scope should show the dot');
+  ui.click(ui.option('non-component')); // same one again
+  assert.ok(ui.option('all').classList.contains('select-menu__item--selected'), 'should fall back to Everywhere');
+  assert.ok(!ui.el('filterBtn').classList.contains('is-active'), 'the dot should clear at the default scope');
+});
+
+test('Replace mode swaps the name field placeholder, and turning it off restores the original', function() {
+  var ui = loadUi();
+  var original = ui.el('frameName').placeholder;
+  assert.ok(/wildcard/.test(original), 'sanity check on the default placeholder: ' + original);
+  ui.click(ui.el('replaceToggleBtn'));
+  assert.strictEqual(ui.el('frameName').placeholder, 'Text to find...', 'the wildcard placeholder would be misleading in Replace mode');
+  ui.click(ui.el('replaceToggleBtn'));
+  assert.strictEqual(ui.el('frameName').placeholder, original, 'the original placeholder should come back');
+});
+
+test('turning Replace mode off empties both the find and replace fields', function() {
+  var ui = loadUi();
+  ui.click(ui.el('replaceToggleBtn'));
+  ui.el('frameName').value = 'Header';
+  ui.el('replaceWith').value = 'Banner';
+  ui.click(ui.el('replaceToggleBtn'));
+  assert.strictEqual(ui.el('frameName').value, '', 'the find text should be cleared on leaving Replace mode');
+  assert.strictEqual(ui.el('replaceWith').value, '', 'the replacement text should be cleared on leaving Replace mode');
+});
+
+test('clicking an already-checked type filter toggles back to All types', function() {
+  var ui = loadUi();
+  ui.click(ui.option('component'));
+  ui.click(ui.option('component'));
+  assert.ok(ui.option('all').classList.contains('select-menu__item--selected'), 're-clicking Components only should fall back to All types');
+});
+
+test('switching type filters never touches the name field', function() {
+  var ui = loadUi();
+  ui.el('frameName').value = 'Header';
+  ui.click(ui.option('component'));
+  ui.click(ui.option('non-component'));
+  ui.click(ui.option('all'));
+  assert.strictEqual(ui.el('frameName').value, 'Header', 'switching among the type filters should not clear the search');
+});
+
+test('Replace all sends the find text, the replacement and the visibility filter', function() {
+  var ui = loadUi();
+  ui.click(ui.el('replaceToggleBtn'));
+  ui.el('frameName').value = ' Header ';
+  ui.el('replaceWith').value = 'Banner';
+  ui.click(ui.el('replaceAllBtn'));
+  assert.deepStrictEqual(ui.lastPosted(), { type: 'replace-all', name: 'Header', replaceWith: 'Banner', visibility: 'all', scope: 'everywhere' });
+});
+
+test('Replace all with an empty find field shows an error instead of replacing', function() {
+  var ui = loadUi();
+  ui.click(ui.el('replaceToggleBtn'));
+  var before = ui.posted.length;
+  ui.click(ui.el('replaceAllBtn'));
+  assert.strictEqual(ui.posted.length, before, 'nothing should be posted for empty text to find');
+  assert.ok(/enter text to find/i.test(ui.el('message').textContent), 'expected an error message');
+  assert.ok(/snapkit-toast--error/.test(ui.el('message').className), 'errors should use the error toast: ' + ui.el('message').className);
 });
 
 test('Select sends the name and the active type filter', function() {

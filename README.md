@@ -1,4 +1,4 @@
-# SnapKit v1.0.6-alpha
+# SnapKit v1.0.7-alpha
 
 A Figma plugin for finding elements fast and putting them where they belong / search by name, type and visibility, then set absolute positioning, align, duplicate or clean up in one click, or CMD+SHIFT+R to replace by the copied elements.
 
@@ -30,8 +30,8 @@ SnapKit is built with [plugin-ds-skill](https://github.com/jeancharlesamey/plugi
 The panel is split into two titled sections so searching never gets mixed up with changing the document:
 
 ```
-SELECTION (9)                                         ← how many are selected now
-  [ 🔍 Name(s) comma separated, * ...  ✕ ] [⚙]        ← ✕ clears it, ⚙ = element type
+SELECTION (9)                                    Replace ← toggles Replace mode, see below
+  [ 🔍 Name(s) comma separated, * ...  ✕ ] [⚙]        ← ✕ clears it, ⚙ = selection scope
   (o) All          ( ) Visible     ( ) Hidden         ← visibility, one line
   [ Select ]                       [ Select absolute ]
 
@@ -44,7 +44,9 @@ ACTIONS
   [ ↑ ] [ ↕ ] [ ↓ ]                                     ← align vertically
 ```
 
-The **Selection** title carries the number of elements currently selected, so the result of a search is still readable after the toast that announced it has faded. Everything under **Selection** only reads the file. Everything under **Actions** modifies it — the two destructive ones, *Delete absolute* and *Delete selected*, are the red buttons.
+The **Selection** title carries the number of elements currently selected, so the result of a search is still readable after the toast that announced it has faded. Everything under **Selection** only reads the file, with one exception — **Replace**, which sits on the Selection title row for space rather than in the Actions grid, but does modify the file; see [Replace](#replace). Everything under **Actions** modifies it too — the two destructive ones, *Delete absolute* and *Delete selected*, are the red buttons.
+
+The window also resizes itself to fit whatever is currently showing — turning Replace on/off grows or shrinks the actual plugin window by exactly the height of the row it adds or removes, rather than leaving a fixed-size panel to scroll.
 
 
 ## SELECTION
@@ -63,7 +65,7 @@ Type one or more names in the field and press **Select**. Names are comma separa
 ### Select absolute
 **Select absolute** runs the same search but keeps only absolute-positioned elements. Unlike **Select**, it accepts an **empty name field** — that means "every absolute element in scope", which is the quickest way to audit the sticky headers and fixed navigation in a prototype.
 
-### Element type filter
+### Selection scope filter
 The **filter icon** next to the name field opens a small menu — the dark HUD menu Figma uses for its own dropdowns — with three choices:
 
 - **All types** (default)
@@ -71,6 +73,8 @@ The **filter icon** next to the name field opens a small menu — the dark HUD m
 - **Everything but components** — frames, groups, text, shapes…
 
 Use it when a frame and a real component share a name and you only want one of them. The filter is **sticky**: it stays on your choice until you change it, and a **red dot** on the icon is the reminder that a search is narrowed.
+
+While **Replace** is on, this same menu relabels itself into Replace's own three choices instead — see [Replace scope](#replace-scope).
 
 ### Visibility filter
 The radio group under the name field decides what a search looks at:
@@ -93,6 +97,38 @@ While a search runs, the loader spells out what is actually being looked for, so
 > *Searching for absolute elements named “Header” / components only / hidden elements only / inside the current selection*
 
 It names the element kind (all elements vs absolute only, from the button you pressed), the name(s) typed (or *with any name* when the field is empty), the type filter, the visibility filter and the scope. A long search cycles through progress messages and, after a while, offers a **Stop the selection** button. The result message repeats the active filters too.
+
+
+## REPLACE
+
+**Replace** is a plain text toggle at the right of the Selection title — click it once to turn it on:
+
+```
+SELECTION (9)                                    Replace ✕  ← click again to turn it off
+  [ Text to find...                    ✕ ] [⚙]              ← reuses the name field
+  [ Replace with...                     ] [ Replace all ]   ← new row, only while Replace is on
+  (o) All          ( ) Visible     ( ) Hidden
+  [ Select ]                       [ Select absolute ]
+```
+
+Turning it off clears both fields and puts the Selection scope filter back to its normal meaning — nothing is left behind for next time, and the window shrinks back down to its usual size.
+
+### Find and replace
+Type the text to find in the name field (its placeholder becomes *Text to find...*) and what to replace it with in the new field underneath, then press **Replace all**. Unlike Select's name field, this is a **plain, case-insensitive, literal string** — no `*` wildcard, no comma-separated list — to match how Figma's own Find and replace works.
+
+### Replace scope
+While Replace is on, the **Selection scope filter** dropdown relabels its three slots into where to look, instead of which element type to keep:
+
+- **Everywhere** (default) — matches a node's name, or, for text layers, its rendered content
+- **In section and frames only** — only matches the **names** of frames and sections; text content and every other node type are left alone
+- **In text only** — only matches the **rendered content** of text layers; every layer's name, including the text layer's own, is left alone
+
+The red dot and the sticky behaviour work exactly the same as the normal filter — and picking a scope here never touches your normal type filter choice, or vice versa; the two are independent.
+
+### What gets changed
+A single match can hit a node's name, a text layer's content, or both at once — Replace all rewrites every occurrence it finds, wherever it finds it, in one pass. The **visibility filter** still applies underneath (narrow to visible-only or hidden-only layers, same as any search), and the **scope is the same as Select**: the current selection if something's selected, the whole page otherwise.
+
+The result message reports how many occurrences were replaced and in how many elements. If one of them couldn't be updated — most commonly a font Figma can't load — it says so honestly instead of reporting the whole run as failed.
 
 
 ## ACTIONS
@@ -152,6 +188,14 @@ Buttons enable and disable themselves as your selection changes: *Set to absolut
 1. Select the frames to clean, or nothing for the whole page
 2. **Delete absolute**
 
+**Rename a component and its on-screen text together**
+1. **Replace** → type the old name, type the new one
+2. **Replace all** — updates every matching layer name and every matching bit of visible text, page-wide
+
+**Rewrite copy without touching any layer names**
+1. **Replace** → filter icon → **In text only**
+2. Type the text to find and its replacement → **Replace all**
+
 
 ## TIPS
 
@@ -160,9 +204,82 @@ Buttons enable and disable themselves as your selection changes: *Set to absolut
 - **Read the loader** — if a search returns something unexpected, the line under the spinner says exactly what SnapKit looked for
 - **Empty name is a feature** — with *Select absolute* or a *Hidden* search it means "everything in scope"
 - **Sections are supported** — searches and *Delete absolute* both walk into sections
+- **Replace is its own mode** — turning it on relabels the Selection scope filter into where Replace should look (Everywhere / In section and frames only / In text only); turning it off restores the normal type filter and clears both fields
+
+
+## DEVELOPMENT
+
+### Layout
+
+```
+code.js                                    the Figma main thread
+manifest.json                              points at code.js and ui.html
+ui.html                                    GENERATED — do not edit
+scripts/build-ui.js                        builds ui.html from ui/
+ui/
+  index.html                               the panel markup
+  ds-overrides.css                         the only local changes to the DS
+  snapkit.css                              layout + SnapKit's own components
+  snapkit.js                               the panel behaviour
+  vendor/figma-plugin-ds/                  the design system, vendored (MIT)
+test/                                      the test suite
+```
+
+### The design system
+
+The UI uses **[figma-plugin-ds](https://github.com/thomas-lowry/figma-plugin-ds)** by Tom Lowry, a CSS library that reproduces Figma's own controls. Its stylesheet is **copied into `ui/vendor/figma-plugin-ds/`** rather than installed: SnapKit has no `npm install` step, and a plugin iframe cannot resolve a remote or relative stylesheet anyway. `ui/vendor/figma-plugin-ds/README.md` records the version and how to update it — drop in the new file, run `npm run build:ui`.
+
+The overrides are kept apart from the rest of the CSS so an upstream release cannot quietly break the panel:
+
+- **`ui/ds-overrides.css`** is the only file that styles a DS class, and the vendored copy is never patched. It is inlined right after the design system, so at equal specificity it wins on source order. When the DS is updated, this is the one file to re-read
+- **`ui/snapkit.css`** is layout plus the components the DS has no equivalent for (the toast, the search overlay, the field's clear button). It may lean on a DS class to *find* an element, but every property it sets lands on a `.snapkit-*` element of our own
+
+`test/ui.test.js` enforces both halves of that split, so a DS override added to the wrong file fails the suite. New controls should reach for a DS class first.
+
+### The build step
+
+Figma serves the plugin UI from a sandboxed iframe with no document base, so `ui.html` has to be one self-contained file. `scripts/build-ui.js` inlines the stylesheets and the script from `ui/`, and strips the design system's remote Inter `@font-face` rules so the panel never touches the network.
+
+```
+npm run build:ui
+```
+
+`ui.html` is committed so the plugin can be imported straight from the manifest. `npm test` fails if it is out of date.
+
+### Tests
+
+The plugin runs inside Figma, but its logic is covered by a dependency-free test suite that mocks the Figma plugin API:
+
+- `test/plugin.test.js` — every UI message handler (select, select absolute, duplicate, set to absolute, align, delete absolute, delete, replace all, resize), including the type filter, the visibility filter and the three Replace scopes
+- `test/ui.test.js` — reads the built `ui.html` and runs its inline script against a small DOM stub, covering the selection scope filter menu (and how it relabels itself for Replace mode), the visibility radio group, the Selection / Replace / Actions areas, the selection count and the field's clear button, the loader overlay and its search-context line, the context-aware button states, the window-resize messages, that the DS overrides stay in their own stylesheet, and that nothing in the panel is loaded from the network
+
+```
+npm test
+```
+
+No `npm install` needed — everything uses Node built-ins only.
+
+Version numbers live in `README.md` (title, release notes, footer), `package.json`, the header comment of `code.js`, and the `name` field of `manifest.json`. The manifest `id` is deliberately left alone: Figma treats it as the plugin's identity.
 
 
 ## RELEASE NOTES
+
+### v1.0.7-alpha
+**New Features:**
+- **Replace** — a new find-and-replace mode, toggled from a plain text link on the Selection title row rather than a button in the Actions grid, even though it does modify the file
+  - Reuses the name field as the "find" text (placeholder becomes *Text to find...*) plus a new "Replace with..." field and a **Replace all** button, on their own row
+  - Plain, case-insensitive, literal substring matching — no `*` wildcard, no comma-separated list, to match how Figma's own Find and replace works
+  - The **Selection scope filter** dropdown relabels its three slots while Replace is on: **Everywhere** (name or text content, default), **In section and frames only** (frame/section names only), **In text only** (text layer content only) — fully independent from the normal type filter; picking one never affects the other
+  - Combines with the visibility filter and the usual selection-vs-page scope, same as Select
+  - A match can hit a node's name, a text layer's content, or both on the same node — all rewritten in one pass. If one match can't be updated (most commonly a font Figma can't load), the others still go through and the result message says so honestly instead of reporting the whole run as failed
+  - Turning Replace off clears both fields and reverts the filter dropdown to its normal type-filter meaning
+
+**UI Changes:**
+- "Element type filter" renamed to **"Selection scope filter"** throughout the panel and this README, since Replace repurposes the same dropdown for a different kind of scoping
+- The plugin window now resizes itself to fit the panel's actual content instead of staying a fixed size — turning Replace on/off grows or shrinks it by exactly the height of the row it adds or removes, rather than leaving the extra content to scroll
+
+**Improvements:**
+- Added regression tests for the font-load-failure resilience, the window resize message, and every Replace scope combination; the suite is now 117 tests (61 plugin + 56 UI), all passing
 
 ### v1.0.6-alpha
 **Improvements:**
@@ -287,4 +404,4 @@ For issues or feedback, please contact the plugin maintainer via GitHub.
 
 ---
 
-**Current Version**: v1.0.6-alpha
+**Current Version**: v1.0.7-alpha
