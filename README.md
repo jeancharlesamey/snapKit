@@ -5,6 +5,17 @@ A Figma plugin for finding elements fast and putting them where they belong / se
 **Privacy first**: SnapKit runs entirely inside Figma. Nothing is sent to a server — everything happens locally in the plugin and in your Figma file.
 
 
+## Contents
+- [Installation](#installation)
+- [The panel](#the-panel)
+- [Selection](#selection)
+- [Actions](#actions)
+- [Recipes](#recipes)
+- [Tips](#tips)
+- [Release notes](#release-notes)
+- [Support](#support)
+
+
 ## INSTALLATION
 
 1. In Figma, go to **Plugins** → **Development** → **Import plugin from manifest**
@@ -14,7 +25,7 @@ A Figma plugin for finding elements fast and putting them where they belong / se
 
 ## THE PANEL
 
-SnapKit is built with [`plugin-ds-skill`](https://github.com/jeancharlesamey/plugin-ds-skill), so every control — buttons, the search field, the radios, the type menu, the icons — is the one Figma uses itself. The library is vendored in the repo (see [Development](#development)); nothing is fetched from the network.
+SnapKit is built with [plugin-ds-skill](https://github.com/jeancharlesamey/plugin-ds-skill), so every control — buttons, the search field, the radios, the type menu, the icons — is the one Figma uses itself. The library is vendored in the repo; nothing is fetched from the network.
 
 The panel is split into two titled sections so searching never gets mixed up with changing the document:
 
