@@ -5,6 +5,9 @@
 // and onclick — test/ui.test.js runs this file against a tiny DOM stub.
 
 var frameNameInput = document.getElementById('frameName');
+// Restored whenever the filter leaves Replace mode — read once up front so
+// the two placeholder strings never have to be kept in sync by hand.
+var defaultNamePlaceholder = frameNameInput.placeholder;
 var selectBtn = document.getElementById('selectBtn');
 var selectAbsoluteBtn = document.getElementById('selectAbsoluteBtn');
 var duplicateBtn = document.getElementById('duplicateBtn');
@@ -25,8 +28,25 @@ var overlayContext = document.getElementById('overlayContext');
 var filterBtn = document.getElementById('filterBtn');
 var filterPopover = document.getElementById('filterPopover');
 var filterOptions = filterPopover.querySelectorAll('.select-menu__item');
+var filterDividerLabel = document.getElementById('filterDividerLabel');
+// Keyed by the same data-type values the 3 dropdown items already carry —
+// reused as plain slot identifiers so Replace mode doesn't need its own copy
+// of the menu, just a different label and meaning for each existing slot.
+var filterLabelEls = {
+  all: document.getElementById('filterLabelAll'),
+  component: document.getElementById('filterLabelComponent'),
+  'non-component': document.getElementById('filterLabelNonComponent')
+};
+var TYPE_FILTER_LABELS = { all: 'All types', component: 'Components only', 'non-component': 'Everything but components' };
+var REPLACE_SCOPE_LABELS = { all: 'Everywhere', component: 'In section and frames only', 'non-component': 'In text only' };
+var DATA_TYPE_TO_REPLACE_SCOPE = { all: 'everywhere', component: 'structure', 'non-component': 'text' };
+var REPLACE_SCOPE_TO_DATA_TYPE = { everywhere: 'all', structure: 'component', text: 'non-component' };
 var clearNameBtn = document.getElementById('clearName');
 var selectionCount = document.getElementById('selectionCount');
+var replaceRow = document.getElementById('replaceRow');
+var replaceWithInput = document.getElementById('replaceWith');
+var replaceAllBtn = document.getElementById('replaceAllBtn');
+var replaceToggleBtn = document.getElementById('replaceToggleBtn');
 var visibilityRadios = [
   document.getElementById('visAll'),
   document.getElementById('visVisible'),
@@ -35,6 +55,8 @@ var visibilityRadios = [
 
 var typeFilter = 'all';
 var visibilityFilter = 'all';
+var replaceMode = false;
+var replaceScope = 'everywhere';
 var hasSelectionScope = false;
 
 // --- visibility filter ------------------------------------------------------
@@ -76,10 +98,94 @@ function setTypeFilter(value) {
   }
   filterBtn.classList.toggle('is-active', value !== 'all');
   filterBtn.title = value === 'component'
-    ? 'Element type: components only'
+    ? 'Selection scope: components only'
     : value === 'non-component'
-      ? 'Element type: everything but components'
-      : 'Filter by element type';
+      ? 'Selection scope: everything but components'
+      : 'Filter by selection scope';
+}
+
+// --- replace mode ------------------------------------------------------------
+// Its own toggle rather than a type-filter option: Replace isn't a kind of
+// element to narrow by, it's a different mode that widens the search to text
+// content and swaps in a literal find/replace instead of the name syntax.
+//
+// The 3-item dropdown is reused rather than duplicated: in Replace mode its
+// same 3 slots mean where to look (everywhere / frame+section names only /
+// text content only) instead of which element type to keep, so only the
+// labels and what a click sets need to change per mode — see
+// updateFilterLabels() and the filterOptions click handler below.
+function updateFilterLabels() {
+  var labels = replaceMode ? REPLACE_SCOPE_LABELS : TYPE_FILTER_LABELS;
+  for (var key in filterLabelEls) {
+    filterLabelEls[key].textContent = labels[key];
+  }
+  filterDividerLabel.textContent = replaceMode ? 'Replace scope' : 'Selection scope';
+}
+
+function setReplaceMode(active) {
+  replaceMode = active;
+  replaceToggleBtn.classList.toggle('is-active', active);
+  // The ✕ is what actually reads as "click again to close this", not just the
+  // color/weight change from the is-active class.
+  replaceToggleBtn.textContent = active ? 'Replace ✕' : 'Replace';
+  replaceRow.classList.toggle('is-visible', active);
+  // The name field doubles as the "find" text in Replace mode — its usual
+  // wildcard/comma-list placeholder would be actively misleading there, since
+  // this mode takes a plain literal string instead.
+  frameNameInput.placeholder = active ? 'Text to find...' : defaultNamePlaceholder;
+  // Leaving Replace mode resets it fully — the find/replace text is specific
+  // to that mode and would otherwise sit there unseen, stale, next time it's
+  // turned back on.
+  if (!active) {
+    frameNameInput.value = '';
+    replaceWithInput.value = '';
+  }
+  updateFilterLabels();
+  // Refresh which dropdown item shows as selected, and the filter icon's dot
+  // and tooltip, for whichever state (type filter or replace scope) is the
+  // one that actually applies now.
+  if (active) {
+    setReplaceScope(replaceScope);
+  } else {
+    setTypeFilter(typeFilter);
+  }
+  // The panel's own content height just changed (a whole row appeared or
+  // disappeared) — resize the actual plugin window to match, rather than
+  // leaving it fixed and letting the extra content scroll.
+  resizeToFitContent();
+}
+
+function setReplaceScope(scope) {
+  replaceScope = scope;
+  var activeDataType = REPLACE_SCOPE_TO_DATA_TYPE[scope];
+  for (var i = 0; i < filterOptions.length; i++) {
+    filterOptions[i].classList.toggle(
+      'select-menu__item--selected',
+      filterOptions[i].getAttribute('data-type') === activeDataType
+    );
+  }
+  filterBtn.classList.toggle('is-active', scope !== 'everywhere');
+  filterBtn.title = scope === 'structure'
+    ? 'Replace scope: section and frame names only'
+    : scope === 'text'
+      ? 'Replace scope: text content only'
+      : 'Replace scope: everywhere';
+}
+
+replaceToggleBtn.onclick = function() {
+  setReplaceMode(!replaceMode);
+};
+
+// The window starts at a fixed size (figma.showUI in code.js) and never
+// changes on its own — Figma only resizes it when asked to. Measuring is
+// deferred a frame: reading scrollHeight in the same tick as the classList
+// toggle that hides a row can catch the layout mid-update and report the
+// old, taller height — that showed up as the panel never shrinking back
+// down once the replace row had made it grow.
+function resizeToFitContent() {
+  requestAnimationFrame(function() {
+    parent.postMessage({ pluginMessage: { type: 'resize', height: document.body.scrollHeight } }, '*');
+  });
 }
 
 function closeFilterPopover() {
@@ -94,7 +200,17 @@ filterBtn.onclick = function(e) {
 for (var fi = 0; fi < filterOptions.length; fi++) {
   filterOptions[fi].onclick = function(e) {
     e.stopPropagation();
-    setTypeFilter(this.getAttribute('data-type'));
+    var clickedType = this.getAttribute('data-type');
+    if (replaceMode) {
+      // Same 3 slots, different meaning: this sets where Replace looks, not
+      // the element-type filter.
+      var clickedScope = DATA_TYPE_TO_REPLACE_SCOPE[clickedType];
+      setReplaceScope(clickedScope === replaceScope ? 'everywhere' : clickedScope);
+    } else {
+      // Clicking the already-checked option again toggles it off, back to the
+      // default, rather than being a no-op.
+      setTypeFilter(clickedType === typeFilter ? 'all' : clickedType);
+    }
     closeFilterPopover();
   };
 }
@@ -129,6 +245,22 @@ function searchContextText(mode, name) {
   var scope = hasSelectionScope ? 'inside the current selection' : 'across the whole page';
   return 'Searching for ' + subject + ' ' + nameText + ' / ' + typeFilterPhrase() +
     ' / ' + visibilityPhrase() + ' / ' + scope;
+}
+
+function replaceScopePhrase() {
+  return replaceScope === 'structure'
+    ? 'section and frame names only'
+    : replaceScope === 'text'
+      ? 'text content only'
+      : 'everywhere';
+}
+
+// Same shape as searchContextText, but the find/replace strings are literal —
+// no wildcard, no comma list — so they're just quoted as typed.
+function replaceContextText(findText, replaceText) {
+  var searchScope = hasSelectionScope ? 'inside the current selection' : 'across the whole page';
+  return 'Replacing “' + findText + '” with “' + (replaceText || '') + '” / ' + replaceScopePhrase() +
+    ' / ' + visibilityPhrase() + ' / ' + searchScope;
 }
 
 function showOverlay(context) {
@@ -168,6 +300,20 @@ selectAbsoluteBtn.onclick = function() {
   var name = frameNameInput.value.trim();
   showOverlay(searchContextText('absolute', name));
   parent.postMessage({ pluginMessage: { type: 'select-absolute', name: name, typeFilter: typeFilter, visibility: visibilityFilter } }, '*');
+};
+
+// --- replace ------------------------------------------------------------
+
+replaceAllBtn.onclick = function() {
+  // Reuses the name field as the "find" text — the new field only holds the
+  // replacement — so this is the same empty-input guard selectBtn uses.
+  var findText = frameNameInput.value.trim();
+  if (!findText) {
+    showMessage('Please enter text to find', 'error');
+    return;
+  }
+  showOverlay(replaceContextText(findText, replaceWithInput.value));
+  parent.postMessage({ pluginMessage: { type: 'replace-all', name: findText, replaceWith: replaceWithInput.value, visibility: visibilityFilter, scope: replaceScope } }, '*');
 };
 
 // --- actions ----------------------------------------------------------------
@@ -240,5 +386,6 @@ function updateButtonStates(hasSelection, hasAbsolute, hasNonAbsolute, hasContai
 
 parent.postMessage({ pluginMessage: { type: 'check-selection' } }, '*');
 setTypeFilter(typeFilter);
+setReplaceMode(replaceMode);
 setVisibilityFilter(visibilityFilter);
 setSelectionCount(0);

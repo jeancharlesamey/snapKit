@@ -37,6 +37,26 @@ body {
   min-width: 0;
 }
 
+/* Pins the Replace toggle to the right of the Selection title. */
+.snapkit-row--split {
+  justify-content: space-between;
+}
+
+/* Black (not the tertiary button's usual blue) at rest, and no underline at
+   all, in any state — the DS underlines .button--tertiary on focus, but that
+   reads as noise stacked right next to the Selection title. */
+.snapkit-replace-toggle,
+.snapkit-replace-toggle:enabled:focus {
+  color: var(--black8);
+  text-decoration: none;
+}
+
+/* Bold is the only change left for "on" — the "✕" appended to the label (see
+   snapkit.js) is what actually reads as "click again to turn this off". */
+.snapkit-replace-toggle.is-active {
+  font-weight: var(--font-weight-bold);
+}
+
 .snapkit-grid {
   display: grid;
   gap: var(--size-xxxsmall);
@@ -44,6 +64,18 @@ body {
 
 .snapkit-grid--2 { grid-template-columns: 1fr 1fr; }
 .snapkit-grid--3 { grid-template-columns: repeat(3, 1fr); }
+
+/* --- replace field ---------------------------------------------------------- */
+
+/* Only shown while the Replace filter is the active element-type option —
+   snapkit.js toggles is-visible alongside the filter's own selected state. */
+.snapkit-replace-row {
+  display: none;
+}
+
+.snapkit-replace-row.is-visible {
+  display: flex;
+}
 
 /* --- clear button in the search field ------------------------------------- */
 

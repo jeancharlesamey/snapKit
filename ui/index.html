@@ -21,8 +21,13 @@
     <div id="message" class="snapkit-toast"></div>
 
     <!-- The count outlives the toast, so how many elements a search picked up is
-         still readable once the toast has gone. -->
-    <div class="section-title">Selection <span id="selectionCount">(0)</span></div>
+         still readable once the toast has gone. Replace lives here rather than
+         in the type filter dropdown: it isn't a type filter, it's its own mode
+         that widens the search to text content, so it gets its own toggle. -->
+    <div class="snapkit-row snapkit-row--split">
+      <div class="section-title">Selection <span id="selectionCount">(0)</span></div>
+      <button id="replaceToggleBtn" class="button button--tertiary snapkit-replace-toggle" type="button">Replace</button>
+    </div>
 
     <div class="snapkit-row">
       <div class="input input--with-icon snapkit-row__grow">
@@ -42,23 +47,33 @@
         </button>
       </div>
       <div class="select-menu snapkit-filter">
-        <button id="filterBtn" class="icon-button snapkit-filter__button" title="Filter by element type">
+        <button id="filterBtn" class="icon-button snapkit-filter__button" title="Filter by selection scope">
           <div class="icon icon--adjust"></div>
           <span class="snapkit-filter__dot"></span>
         </button>
         <div id="filterPopover" class="select-menu__menu snapkit-filter__menu">
-          <span class="select-menu__divider-label">Element type</span>
+          <span class="select-menu__divider-label" id="filterDividerLabel">Selection scope</span>
           <div class="select-menu__item select-menu__item--selected snapkit-filter__item" data-type="all">
-            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">All types</span>
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label" id="filterLabelAll">All types</span>
           </div>
           <div class="select-menu__item snapkit-filter__item" data-type="component">
-            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Components only</span>
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label" id="filterLabelComponent">Components only</span>
           </div>
           <div class="select-menu__item snapkit-filter__item" data-type="non-component">
-            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Everything but components</span>
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label" id="filterLabelNonComponent">Everything but components</span>
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Only shown while Replace mode is on. Unlike the name field, this is a
+         literal, case-insensitive substring — no *, no comma list — to match
+         how Figma's own Find and replace works. -->
+    <div class="snapkit-row snapkit-replace-row" id="replaceRow">
+      <div class="input snapkit-row__grow">
+        <input id="replaceWith" type="text" class="input__field" placeholder="Replace with...">
+      </div>
+      <button id="replaceAllBtn" class="button button--primary">Replace all</button>
     </div>
 
     <div class="snapkit-radios" id="visibilityRow">

@@ -1,4 +1,4 @@
-// SnapKit - Figma Plugin v1.0.4-alpha
+// SnapKit - Figma Plugin v1.0.7-alpha
 // Comprehensive plugin with alignment, absolute positioning, and component selection
 
 // The panel markup lives in ui/ (built into ui.html by npm run build:ui) and is
@@ -176,6 +176,163 @@ function getSearchTargets() {
     return { items: figma.currentPage.children, pageWide: true };
   }
   return { items: selection, pageWide: false };
+}
+
+// --- replace mode --------------------------------------------------------------
+// 'replace' is the element-type filter's 4th option, but it isn't really a type
+// filter: picking it swaps the search for a wider rule — a literal, case-
+// insensitive substring match against a node's name, or (for TEXT nodes) its
+// rendered characters — instead of narrowing by node type. No wildcards, no
+// comma-separated list: this is meant to behave like Figma's own Find and
+// replace, not the name-search syntax used everywhere else in the plugin.
+function escapeRegExp(str) {
+  return str.replace(/[.*+^${}()|[\]\\]/g, '\\$&');
+}
+
+function containsSubstring(haystack, needle) {
+  return haystack.toLowerCase().indexOf(needle.toLowerCase()) !== -1;
+}
+
+function replaceAllOccurrences(haystack, needle, replacement) {
+  var re = new RegExp(escapeRegExp(needle), 'gi');
+  return haystack.replace(re, replacement);
+}
+
+function countOccurrences(haystack, needle) {
+  var re = new RegExp(escapeRegExp(needle), 'gi');
+  var found = haystack.match(re);
+  return found ? found.length : 0;
+}
+
+// Where Replace should look. 'everywhere' (the default) checks a node's name
+// AND, for TEXT nodes, its rendered content. 'structure' narrows to just the
+// names of FRAME/SECTION nodes (renaming layers, not touching any text).
+// 'text' narrows to just TEXT nodes' rendered content (rewriting copy,
+// leaving every layer name alone).
+function normalizeReplaceScope(scope) {
+  return scope === 'structure' || scope === 'text' ? scope : 'everywhere';
+}
+
+function replaceScopeLabel(scope) {
+  if (scope === 'structure') return ' (in section and frames only)';
+  if (scope === 'text') return ' (in text only)';
+  return '';
+}
+
+// Find every match in scope. The container itself counts as a candidate,
+// same as the name search above.
+function findReplaceMatches(container, needle, visibility, scope, results) {
+  var check = function(node) {
+    if (!matchesVisibilityFilter(node, visibility)) return;
+    var nameMatch = false;
+    var contentMatch = false;
+    if (scope === 'structure') {
+      nameMatch = (node.type === 'FRAME' || node.type === 'SECTION') && containsSubstring(node.name, needle);
+    } else if (scope === 'text') {
+      contentMatch = node.type === 'TEXT' && 'characters' in node && containsSubstring(node.characters, needle);
+    } else {
+      nameMatch = containsSubstring(node.name, needle);
+      contentMatch = node.type === 'TEXT' && 'characters' in node && containsSubstring(node.characters, needle);
+    }
+    if (nameMatch || contentMatch) {
+      results.push({ node: node, nameMatch: nameMatch, contentMatch: contentMatch });
+    }
+  };
+  check(container);
+  walkTree(container, check);
+}
+
+// A text run can mix fonts, and Figma throws if you set .characters without
+// loading every font used first — this loads them all, not just the first.
+function loadFontsForTextNode(node) {
+  var fontNames = node.getRangeAllFontNames(0, node.characters.length);
+  return Promise.all(fontNames.map(function(font) { return figma.loadFontAsync(font); }));
+}
+
+// Renaming is synchronous, same as everywhere else in the plugin. Editing text
+// content needs the font-load step above, so this — and only this — is async.
+function replaceOne(match, needle, replacement) {
+  var occurrences = 0;
+  if (match.nameMatch) {
+    occurrences += countOccurrences(match.node.name, needle);
+    match.node.name = replaceAllOccurrences(match.node.name, needle, replacement);
+  }
+  if (!match.contentMatch) {
+    return Promise.resolve(occurrences);
+  }
+  return loadFontsForTextNode(match.node).then(function() {
+    occurrences += countOccurrences(match.node.characters, needle);
+    match.node.characters = replaceAllOccurrences(match.node.characters, needle, replacement);
+    return occurrences;
+  });
+}
+
+// Replace every match found — whole page, or the current selection, same as
+// every other search/select action. One sweep, one result message; no
+// per-match stepping.
+function replaceAll(nameInput, replaceWith, visibility, scope) {
+  visibility = normalizeVisibilityFilter(visibility);
+  scope = normalizeReplaceScope(scope);
+  var needle = (nameInput || '').trim();
+  var replacement = replaceWith || '';
+
+  if (!needle) {
+    figma.ui.postMessage({ type: 'error', text: 'Please enter text to find' });
+    return;
+  }
+
+  var searchTargets = getSearchTargets();
+  var itemsToSearch = searchTargets.items;
+  var searchScope = searchTargets.pageWide ? 'on page' : 'in selected frames';
+  var scopeLabel = replaceScopeLabel(scope);
+
+  var matches = [];
+  for (var i = 0; i < itemsToSearch.length; i++) {
+    findReplaceMatches(itemsToSearch[i], needle, visibility, scope, matches);
+  }
+
+  if (matches.length === 0) {
+    figma.ui.postMessage({ type: 'error', text: 'No matches for "' + needle + '" found ' + searchScope + scopeLabel });
+    return;
+  }
+
+  // One match failing (most commonly: a TEXT node using a font Figma can't
+  // load) must not abort every match after it in the chain, and must not
+  // throw away the ones already written to the file before it. Each match is
+  // caught individually, so the run always gets through the whole list.
+  var chain = Promise.resolve({ occurrences: 0, nodes: [], failed: 0 });
+  matches.forEach(function(match) {
+    chain = chain.then(function(result) {
+      return replaceOne(match, needle, replacement).then(function(count) {
+        result.occurrences += count;
+        result.nodes.push(match.node);
+        return result;
+      }, function() {
+        result.failed++;
+        return result;
+      });
+    });
+  });
+
+  chain.then(function(result) {
+    if (result.nodes.length > 0) {
+      figma.currentPage.selection = result.nodes;
+      // A failure here (e.g. a matched node that's locked or hidden) doesn't
+      // mean the replace itself failed — the text/name edits already landed.
+      try {
+        figma.viewport.scrollAndZoomIntoView(result.nodes);
+      } catch (e) {
+        // not fatal — selection still reflects what was actually changed
+      }
+    }
+    var text = 'Replaced ' + result.occurrences + ' occurrence(s) in ' + result.nodes.length + ' element(s) ' + searchScope + scopeLabel;
+    if (result.failed > 0) {
+      text += ' (' + result.failed + ' element(s) could not be updated — often a font Figma could not load)';
+    }
+    figma.ui.postMessage({ type: 'success', text: text });
+  }).catch(function(e) {
+    figma.ui.postMessage({ type: 'error', text: 'Could not complete the replace: ' + (e && e.message ? e.message : e) });
+  });
 }
 
 // Select a frame by name within selected frames or all page frames
@@ -691,8 +848,16 @@ figma.ui.onmessage = function(msg) {
     alignElements(msg.position, msg.shift);
   } else if (msg.type === 'remove-absolute') {
     removeAbsoluteComponents();
+  } else if (msg.type === 'replace-all') {
+    replaceAll(msg.name, msg.replaceWith, msg.visibility, msg.scope);
   } else if (msg.type === 'clear-selection') {
     figma.currentPage.selection = [];
+  } else if (msg.type === 'resize') {
+    // The panel's own content height changes when a row like the Replace
+    // field shows or hides — the UI measures itself and asks for exactly the
+    // height it needs, rather than the window staying fixed and the extra
+    // content scrolling.
+    figma.ui.resize(320, msg.height);
   } else if (msg.type === 'check-selection') {
     postSelectionState(figma.currentPage.selection);
   }
