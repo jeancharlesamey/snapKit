@@ -47,6 +47,8 @@ var replaceRow = document.getElementById('replaceRow');
 var replaceWithInput = document.getElementById('replaceWith');
 var replaceAllBtn = document.getElementById('replaceAllBtn');
 var replaceToggleBtn = document.getElementById('replaceToggleBtn');
+var selectionOnlySection = document.getElementById('selectionOnlySection');
+var selectionSectionHideTimer = null;
 var visibilityRadios = [
   document.getElementById('visAll'),
   document.getElementById('visVisible'),
@@ -122,6 +124,28 @@ function updateFilterLabels() {
   filterDividerLabel.textContent = replaceMode ? 'Replace scope' : 'Selection scope';
 }
 
+// Fades .snapkit-selection-only in or out around Replace mode. Hiding waits
+// for the opacity transition to finish before switching to display:none and
+// shrinking the panel — collapsing the space immediately would clip the fade
+// mid-flight. Showing does the opposite: the space (and the resize to fit it)
+// come back right away, then the content fades in within it.
+function setSelectionSectionVisible(visible) {
+  clearTimeout(selectionSectionHideTimer);
+  if (visible) {
+    selectionOnlySection.classList.remove('is-hidden');
+    // Forces layout before the opacity class is removed, so the browser
+    // treats it as a transition rather than a no-op from the display swap.
+    void selectionOnlySection.offsetHeight;
+    selectionOnlySection.classList.remove('is-fading');
+  } else {
+    selectionOnlySection.classList.add('is-fading');
+    selectionSectionHideTimer = setTimeout(function() {
+      selectionOnlySection.classList.add('is-hidden');
+      resizeToFitContent();
+    }, 200);
+  }
+}
+
 function setReplaceMode(active) {
   replaceMode = active;
   replaceToggleBtn.classList.toggle('is-active', active);
@@ -129,6 +153,7 @@ function setReplaceMode(active) {
   // color/weight change from the is-active class.
   replaceToggleBtn.textContent = active ? 'Replace ✕' : 'Replace';
   replaceRow.classList.toggle('is-visible', active);
+  setSelectionSectionVisible(!active);
   // The name field doubles as the "find" text in Replace mode — its usual
   // wildcard/comma-list placeholder would be actively misleading there, since
   // this mode takes a plain literal string instead.

@@ -140,6 +140,7 @@ function loadUi() {
     window: {},
     parent: { postMessage: function(msg) { posted.push(msg.pluginMessage); } },
     setTimeout: function() {},
+    clearTimeout: function() {},
     // Unlike setTimeout above (deliberately inert, so the toast's auto-hide
     // never fires mid-test), this runs its callback right away — the resize
     // behavior it defers is exactly what's under test here.
@@ -500,7 +501,7 @@ test('the loader overlay shows during a search and hides on the result', functio
   ui.el('frameName').value = 'Card';
   ui.click(ui.el('selectBtn'));
   assert.ok(ui.el('overlay').classList.contains('is-visible'), 'overlay should show while searching');
-  ui.send({ type: 'success', text: 'Found and selected 2 element(s)' });
+  ui.send({ type: 'success', text: 'Found and selected 2 elements' });
   assert.ok(!ui.el('overlay').classList.contains('is-visible'), 'overlay should hide on success');
 
   ui.click(ui.el('selectBtn'));
