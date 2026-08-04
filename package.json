@@ -1,6 +1,6 @@
 {
   "name": "snapkit",
-  "version": "1.0.7-alpha",
+  "version": "1.0.8-alpha",
   "description": "A Figma plugin for managing prototype elements with absolute positioning, alignment, and component selection.",
   "private": true,
   "scripts": {

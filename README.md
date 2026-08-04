@@ -1,4 +1,4 @@
-# SnapKit v1.0.7-alpha
+# SnapKit v1.0.8-alpha
 
 A Figma plugin for finding elements fast and putting them where they belong / search by name, type and visibility, then set absolute positioning, align, duplicate or clean up in one click, or CMD+SHIFT+R to replace by the copied elements.
 
@@ -46,7 +46,7 @@ ACTIONS
 
 The **Selection** title carries the number of elements currently selected, so the result of a search is still readable after the toast that announced it has faded. Everything under **Selection** only reads the file, with one exception — **Replace**, which sits on the Selection title row for space rather than in the Actions grid, but does modify the file; see [Replace](#replace). Everything under **Actions** modifies it too — the two destructive ones, *Delete absolute* and *Delete selected*, are the red buttons.
 
-The window also resizes itself to fit whatever is currently showing — turning Replace on/off grows or shrinks the actual plugin window by exactly the height of the row it adds or removes, rather than leaving a fixed-size panel to scroll.
+The window also resizes itself to fit whatever is currently showing — turning Replace on/off grows or shrinks the actual plugin window by exactly the height of the row it adds or removes, rather than leaving a fixed-size panel to scroll. Turning Replace on also fades out the visibility radios, *Select* / *Select absolute* and the whole **Actions** block, since none of them act on a selection while Replace is active; turning it back off fades them back in.
 
 
 ## SELECTION
@@ -107,11 +107,9 @@ It names the element kind (all elements vs absolute only, from the button you pr
 SELECTION (9)                                    Replace ✕  ← click again to turn it off
   [ Text to find...                    ✕ ] [⚙]              ← reuses the name field
   [ Replace with...                     ] [ Replace all ]   ← new row, only while Replace is on
-  (o) All          ( ) Visible     ( ) Hidden
-  [ Select ]                       [ Select absolute ]
 ```
 
-Turning it off clears both fields and puts the Selection scope filter back to its normal meaning — nothing is left behind for next time, and the window shrinks back down to its usual size.
+The visibility radios, *Select* / *Select absolute* and the **Actions** block fade out the moment Replace turns on — none of them act on a canvas selection, which Replace mode doesn't use. Turning it off clears both fields, puts the Selection scope filter back to its normal meaning, and fades that whole block back in — nothing is left behind for next time, and the window shrinks back down to its usual size.
 
 ### Find and replace
 Type the text to find in the name field (its placeholder becomes *Text to find...*) and what to replace it with in the new field underneath, then press **Replace all**. Unlike Select's name field, this is a **plain, case-insensitive, literal string** — no `*` wildcard, no comma-separated list — to match how Figma's own Find and replace works.
@@ -264,6 +262,13 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 
 ## RELEASE NOTES
 
+### v1.0.8-alpha
+**UI Changes:**
+- Turning Replace mode on now fades out the visibility radios, *Select* / *Select absolute* and the whole **Actions** block — none of them act on a canvas selection, which Replace mode doesn't use. They fade back in on the way out. The panel only resizes down once the fade has actually finished, so the collapse doesn't clip content mid-transition
+
+**Improvements:**
+- Fixed inconsistent singular/plural wording across every result message — "Replaced 50 occurrence(s) in 35 element(s)..." now reads "Replaced 50 occurrences in 35 elements...", down to "Replaced 1 occurrence in 1 element in selected frame" when there's exactly one of each. Applies to every count-reporting message in `code.js`: replace-all, select-by-name, select-absolute, duplicate, delete, set-absolute, set-fixed-scroll, align and delete-absolute. The "in selected frame(s)/section(s)" scope phrase now pluralizes on the actual number of frames or sections in scope — independent of whatever other count the message is reporting
+
 ### v1.0.7-alpha
 **New Features:**
 - **Replace** — a new find-and-replace mode, toggled from a plain text link on the Selection title row rather than a button in the Actions grid, even though it does modify the file
@@ -404,4 +409,4 @@ For issues or feedback, please contact the plugin maintainer via GitHub.
 
 ---
 
-**Current Version**: v1.0.7-alpha
+**Current Version**: v1.0.8-alpha

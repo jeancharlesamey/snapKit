@@ -1,4 +1,4 @@
-// SnapKit - Figma Plugin v1.0.7-alpha
+// SnapKit - Figma Plugin v1.0.8-alpha
 // Comprehensive plugin with alignment, absolute positioning, and component selection
 
 // The panel markup lives in ui/ (built into ui.html by npm run build:ui) and is
