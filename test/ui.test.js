@@ -50,7 +50,8 @@ function cssRule(selector) {
 
 // --- minimal DOM stub -------------------------------------------------------
 // Only what the UI script touches: getElementById, querySelectorAll, classList,
-// getAttribute, onclick, offsetWidth, scrollHeight and parent.postMessage.
+// getAttribute, onclick, focus/blur, offsetWidth, scrollHeight and
+// parent.postMessage.
 function makeElement(id, attrs) {
   attrs = attrs || {};
   var classes = (attrs['class'] || '').split(' ').filter(Boolean);
@@ -86,7 +87,8 @@ function makeElement(id, attrs) {
     },
     getAttribute: function(name) { return el._attrs[name] != null ? el._attrs[name] : null; },
     querySelectorAll: function() { return []; },
-    focus: function() { el._focused = true; }
+    focus: function() { el._focused = true; },
+    blur: function() { el._focused = false; }
   };
   return el;
 }
@@ -259,32 +261,37 @@ test('going back to All types clears the active dot', function() {
 test('the Replace toggle reveals the replace row, and turning it off hides it again', function() {
   var ui = loadUi();
   assert.ok(!ui.el('replaceRow').classList.contains('is-visible'), 'hidden until Replace is toggled on');
-  assert.strictEqual(ui.el('replaceToggleBtn').textContent, 'Replace');
+  assert.ok(!ui.el('replaceToggleBtn').classList.contains('icon-button--selected'));
+  assert.strictEqual(ui.el('replaceToggleBtn').title, 'Replace');
   ui.click(ui.el('replaceToggleBtn'));
   assert.ok(ui.el('replaceRow').classList.contains('is-visible'), 'the replace field and button should appear');
-  assert.ok(ui.el('replaceToggleBtn').classList.contains('is-active'), 'the toggle itself should show as active');
-  assert.strictEqual(ui.el('replaceToggleBtn').textContent, 'Replace ✕', 'the label should show a way to close it');
+  assert.ok(ui.el('replaceToggleBtn').classList.contains('icon-button--selected'), 'the toggle itself should show as selected');
+  assert.strictEqual(ui.el('replaceToggleBtn').title, 'Replace (on)', 'the tooltip should show a way to tell it is active');
   ui.click(ui.el('replaceToggleBtn'));
   assert.ok(!ui.el('replaceRow').classList.contains('is-visible'), 'it should hide again once Replace is toggled off');
-  assert.ok(!ui.el('replaceToggleBtn').classList.contains('is-active'), 'the toggle should no longer show as active');
-  assert.strictEqual(ui.el('replaceToggleBtn').textContent, 'Replace', 'the ✕ should go away once it is turned back off');
+  assert.ok(!ui.el('replaceToggleBtn').classList.contains('icon-button--selected'), 'the toggle should no longer show as selected');
+  assert.strictEqual(ui.el('replaceToggleBtn').title, 'Replace', 'the tooltip should revert once it is turned back off');
 });
 
-test('the Replace toggle is black with no underline at rest, not the tertiary button\'s usual blue link style', function() {
+test('the Replace toggle is an icon-button using the text-replacement icon', function() {
   var ui = loadUi();
-  // .snapkit-replace-toggle and its :enabled:focus variant share one rule
-  // block in the source, so either selector string reaches the same
-  // declarations — this checks it through the more specific one.
-  var baseRule = cssRule('.snapkit-replace-toggle:enabled:focus');
-  assert.ok(baseRule && /color: var\(--black8\)/.test(baseRule), 'should override the DS blue at rest, not just when active: ' + baseRule);
-  assert.ok(baseRule && /text-decoration: none/.test(baseRule), 'should override the DS focus underline: ' + baseRule);
+  assert.ok(ui.el('replaceToggleBtn').classList.contains('icon-button'), 'should use the DS icon-button component');
+  assert.ok(/id="replaceToggleBtn"[\s\S]*?icon--text-replacement/.test(ui.html), 'should render the text-replacement icon');
 });
 
-test('the Replace toggle only goes bold when active — the black color already applies at rest', function() {
+// A mouse click leaves a <button> focused, and the DS shows a 2px blue border
+// on :focus — without blurring, that ring would linger around the icon
+// indefinitely once clicked, in both the on and the off state.
+test('clicking the Replace toggle blurs it so the DS focus ring does not linger', function() {
   var ui = loadUi();
-  var activeRule = cssRule('.snapkit-replace-toggle.is-active');
-  assert.ok(activeRule && /font-weight: var\(--font-weight-bold\)/.test(activeRule), 'should be bold when active: ' + activeRule);
-  assert.ok(activeRule && !/color/.test(activeRule), 'color shouldn\'t need to be repeated here: ' + activeRule);
+  var btn = ui.el('replaceToggleBtn');
+  btn.focus();
+  assert.ok(btn._focused, 'sanity check: focus() should mark it focused');
+  ui.click(btn);
+  assert.ok(!btn._focused, 'clicking the toggle on should blur it right after');
+  btn.focus();
+  ui.click(btn);
+  assert.ok(!btn._focused, 'clicking the toggle off should blur it right after too');
 });
 
 test('the dropdown relabels itself for Replace mode, and reverts when Replace is turned off', function() {
@@ -612,6 +619,19 @@ test('the icon buttons carry the grey fill at rest, not only on hover', function
   assert.ok(rule && /background-color: var\(--hover-fill\)/.test(rule),
     'align and filter buttons should show their fill at all times: ' + rule);
   assert.ok(!/background-color: transparent/.test(rule), 'no transparent resting state left: ' + rule);
+});
+
+// The DS's own .icon-button--selected background loses to the grey-fill rule
+// above at equal specificity — both are single-class selectors, and the DS's
+// runs first — unless ds-overrides.css restates it, so this pins the restated
+// rule directly rather than through cssRule() (which only matches an exact,
+// ungrouped selector string).
+test('a selected icon-button stays blue, at rest and on hover, over the grey resting fill', function() {
+  var overrides = withoutComments(cssBlock('ds-overrides.css'));
+  var rule = overrides.match(/\.icon-button--selected[^{]*\{([^}]*)\}/);
+  assert.ok(rule, 'expected an .icon-button--selected override in ds-overrides.css');
+  assert.ok(/background-color: var\(--blue\)/.test(rule[1]), 'should restore the DS blue: ' + rule[1]);
+  assert.ok(/\.icon-button--selected:hover/.test(overrides), 'hover should stay blue too, not fall back to the grey fill');
 });
 
 test('the magnifier is the same grey as the placeholder beside it', function() {

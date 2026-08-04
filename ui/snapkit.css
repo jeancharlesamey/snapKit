@@ -42,21 +42,6 @@ body {
   justify-content: space-between;
 }
 
-/* Black (not the tertiary button's usual blue) at rest, and no underline at
-   all, in any state — the DS underlines .button--tertiary on focus, but that
-   reads as noise stacked right next to the Selection title. */
-.snapkit-replace-toggle,
-.snapkit-replace-toggle:enabled:focus {
-  color: var(--black8);
-  text-decoration: none;
-}
-
-/* Bold is the only change left for "on" — the "✕" appended to the label (see
-   snapkit.js) is what actually reads as "click again to turn this off". */
-.snapkit-replace-toggle.is-active {
-  font-weight: var(--font-weight-bold);
-}
-
 .snapkit-grid {
   display: grid;
   gap: var(--size-xxxsmall);

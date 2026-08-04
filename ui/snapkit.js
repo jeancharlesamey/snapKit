@@ -148,10 +148,8 @@ function setSelectionSectionVisible(visible) {
 
 function setReplaceMode(active) {
   replaceMode = active;
-  replaceToggleBtn.classList.toggle('is-active', active);
-  // The ✕ is what actually reads as "click again to close this", not just the
-  // color/weight change from the is-active class.
-  replaceToggleBtn.textContent = active ? 'Replace ✕' : 'Replace';
+  replaceToggleBtn.classList.toggle('icon-button--selected', active);
+  replaceToggleBtn.title = active ? 'Replace (on)' : 'Replace';
   replaceRow.classList.toggle('is-visible', active);
   setSelectionSectionVisible(!active);
   // The name field doubles as the "find" text in Replace mode — its usual
@@ -199,6 +197,10 @@ function setReplaceScope(scope) {
 
 replaceToggleBtn.onclick = function() {
   setReplaceMode(!replaceMode);
+  // The DS shows a 2px blue border on :focus, and a mouse click leaves the
+  // button focused — without this it lingers around the icon indefinitely,
+  // in both states, since nothing else here ever moves focus off of it.
+  replaceToggleBtn.blur();
 };
 
 // The window starts at a fixed size (figma.showUI in code.js) and never

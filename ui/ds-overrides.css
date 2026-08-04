@@ -70,6 +70,15 @@ body {
   background: var(--hover-fill);
 }
 
+/* The rule above wins over the DS's own .icon-button--selected background at
+   equal specificity (both are single-class selectors, and this file loads
+   after the vendored one) — without restating it here, a selected icon-button
+   would sit at the same grey fill as every other one, at rest and on hover. */
+.icon-button--selected,
+.icon-button--selected:hover {
+  background-color: var(--blue);
+}
+
 .button {
   cursor: pointer;
 }
