@@ -1,4 +1,4 @@
-// SnapKit - Figma Plugin v1.0.7-alpha
+// SnapKit - Figma Plugin v1.0.8-alpha
 // Comprehensive plugin with alignment, absolute positioning, and component selection
 
 // The panel markup lives in ui/ (built into ui.html by npm run build:ui) and is
@@ -178,6 +178,26 @@ function getSearchTargets() {
   return { items: selection, pageWide: false };
 }
 
+// --- message pluralization ----------------------------------------------------
+// Every result message counts something (occurrences, elements, frames...) —
+// pluralize(3, 'element') -> "3 elements", pluralize(1, 'element') -> "1 element".
+function pluralize(count, word) {
+  return count + ' ' + word + (count === 1 ? '' : 's');
+}
+
+// For scope phrases that name a count without showing the number itself, e.g.
+// "in selected " + pluralWord('frame', scope.items.length) -> "frames" or "frame".
+function pluralWord(word, count) {
+  return word + (count === 1 ? '' : 's');
+}
+
+// "on page" ignores count entirely; "in selected frames/sections" pluralizes on
+// how many items are actually in scope — independent of whatever else a given
+// message counts (e.g. 1 occurrence with 2 frames selected still reads "frames").
+function scopeText(pageWide, count, word) {
+  return pageWide ? 'on page' : 'in selected ' + pluralWord(word, count);
+}
+
 // --- replace mode --------------------------------------------------------------
 // 'replace' is the element-type filter's 4th option, but it isn't really a type
 // filter: picking it swaps the search for a wider rule — a literal, case-
@@ -283,7 +303,7 @@ function replaceAll(nameInput, replaceWith, visibility, scope) {
 
   var searchTargets = getSearchTargets();
   var itemsToSearch = searchTargets.items;
-  var searchScope = searchTargets.pageWide ? 'on page' : 'in selected frames';
+  var searchScope = scopeText(searchTargets.pageWide, itemsToSearch.length, 'frame');
   var scopeLabel = replaceScopeLabel(scope);
 
   var matches = [];
@@ -325,9 +345,9 @@ function replaceAll(nameInput, replaceWith, visibility, scope) {
         // not fatal — selection still reflects what was actually changed
       }
     }
-    var text = 'Replaced ' + result.occurrences + ' occurrence(s) in ' + result.nodes.length + ' element(s) ' + searchScope + scopeLabel;
+    var text = 'Replaced ' + pluralize(result.occurrences, 'occurrence') + ' in ' + pluralize(result.nodes.length, 'element') + ' ' + searchScope + scopeLabel;
     if (result.failed > 0) {
-      text += ' (' + result.failed + ' element(s) could not be updated — often a font Figma could not load)';
+      text += ' (' + pluralize(result.failed, 'element') + ' could not be updated — often a font Figma could not load)';
     }
     figma.ui.postMessage({ type: 'success', text: text });
   }).catch(function(e) {
@@ -354,7 +374,7 @@ function selectFrameByName(nameInput, typeFilter, visibility) {
   var matchers = compileNamePatterns(names);
   var scope = getSearchTargets();
   var framesToSearch = scope.items;
-  var searchScope = scope.pageWide ? 'on page' : 'in selected frames';
+  var searchScope = scopeText(scope.pageWide, framesToSearch.length, 'frame');
 
   var foundFrames = [];
 
@@ -375,7 +395,7 @@ function selectFrameByName(nameInput, typeFilter, visibility) {
   if (foundFrames.length > 0) {
     figma.currentPage.selection = foundFrames;
     figma.viewport.scrollAndZoomIntoView(foundFrames);
-    figma.ui.postMessage({ type: 'success', text: 'Found and selected ' + foundFrames.length + ' element(s) named ' + namesDisplay + ' ' + searchScope + filterLabel });
+    figma.ui.postMessage({ type: 'success', text: 'Found and selected ' + pluralize(foundFrames.length, 'element') + ' named ' + namesDisplay + ' ' + searchScope + filterLabel });
   } else {
     figma.ui.postMessage({ type: 'error', text: 'No elements named ' + namesDisplay + ' found ' + searchScope + filterLabel });
   }
@@ -396,7 +416,7 @@ function selectAbsoluteByName(nameInput, typeFilter, visibility) {
 
   var scope = getSearchTargets();
   var framesToSearch = scope.items;
-  var searchScope = scope.pageWide ? 'on page' : 'in selected frames';
+  var searchScope = scopeText(scope.pageWide, framesToSearch.length, 'frame');
 
   var foundFrames = [];
 
@@ -411,11 +431,11 @@ function selectAbsoluteByName(nameInput, typeFilter, visibility) {
   var filterLabel = searchFilterLabel(typeFilter, visibility);
   var successText, errorText;
   if (names.length === 0) {
-    successText = 'Found and selected ' + foundFrames.length + ' absolute element(s) ' + searchScope + filterLabel;
+    successText = 'Found and selected ' + pluralize(foundFrames.length, 'absolute element') + ' ' + searchScope + filterLabel;
     errorText = 'No absolute elements found ' + searchScope + filterLabel;
   } else {
     var namesDisplay = names.length === 1 ? '"' + names[0] + '"' : names.map(function(n) { return '"' + n + '"'; }).join(', ');
-    successText = 'Found and selected ' + foundFrames.length + ' absolute element(s) named ' + namesDisplay + ' ' + searchScope + filterLabel;
+    successText = 'Found and selected ' + pluralize(foundFrames.length, 'absolute element') + ' named ' + namesDisplay + ' ' + searchScope + filterLabel;
     errorText = 'No absolute elements named ' + namesDisplay + ' found ' + searchScope + filterLabel;
   }
 
@@ -465,7 +485,7 @@ function duplicateSelected() {
 
   if (duplicated.length > 0) {
     figma.currentPage.selection = duplicated;
-    figma.ui.postMessage({ type: 'success', text: 'Duplicated ' + duplicated.length + ' element(s)' });
+    figma.ui.postMessage({ type: 'success', text: 'Duplicated ' + pluralize(duplicated.length, 'element') });
   } else {
     figma.ui.postMessage({ type: 'error', text: 'Could not duplicate' });
   }
@@ -495,7 +515,7 @@ function deleteSelected() {
   figma.currentPage.selection = [];
 
   if (deleted > 0) {
-    figma.ui.postMessage({ type: 'success', text: 'Deleted ' + deleted + ' element(s)' });
+    figma.ui.postMessage({ type: 'success', text: 'Deleted ' + pluralize(deleted, 'element') });
   } else {
     figma.ui.postMessage({ type: 'error', text: 'Could not delete elements' });
   }
@@ -560,9 +580,9 @@ function setToAbsolute() {
   }
 
   if (count > 0) {
-    var message = 'Set ' + count + ' element(s) to absolute position';
+    var message = 'Set ' + pluralize(count, 'element') + ' to absolute position';
     if (skippedSections > 0) {
-      message += ' (skipped ' + skippedSections + ' section(s))';
+      message += ' (skipped ' + pluralize(skippedSections, 'section') + ')';
     }
     figma.ui.postMessage({ type: 'success', text: message });
   } else if (skippedSections > 0) {
@@ -634,7 +654,7 @@ function setFixedScroll() {
   }
 
   if (count > 0) {
-    figma.ui.postMessage({ type: 'success', text: 'Set ' + count + ' element(s) to fixed scroll' });
+    figma.ui.postMessage({ type: 'success', text: 'Set ' + pluralize(count, 'element') + ' to fixed scroll' });
   } else {
     figma.ui.postMessage({ type: 'error', text: 'Selected elements must be inside a scrollable container' });
   }
@@ -729,7 +749,7 @@ function alignElements(position, shift) {
   }
 
   if (count > 0) {
-    figma.ui.postMessage({ type: 'success', text: 'Aligned ' + count + ' element(s)' });
+    figma.ui.postMessage({ type: 'success', text: 'Aligned ' + pluralize(count, 'element') });
   } else {
     figma.ui.postMessage({ type: 'error', text: 'Could not align elements' });
   }
@@ -793,7 +813,7 @@ function removeAbsoluteComponents() {
       }
 
       if (removed > 0) {
-        figma.ui.postMessage({ type: 'success', text: 'Deleted ' + removed + ' absolute element(s)' });
+        figma.ui.postMessage({ type: 'success', text: 'Deleted ' + pluralize(removed, 'absolute element') });
       } else {
         figma.ui.postMessage({ type: 'error', text: 'No absolute elements in selection' });
       }
@@ -816,7 +836,7 @@ function removeAbsoluteComponents() {
         break;
       }
     }
-    searchScope = hasSections ? 'in selected sections' : 'in selected frames';
+    searchScope = 'in selected ' + pluralWord(hasSections ? 'section' : 'frame', containersToSearch.length);
   }
 
   for (var s = 0; s < containersToSearch.length; s++) {
@@ -824,7 +844,7 @@ function removeAbsoluteComponents() {
   }
 
   if (removed > 0) {
-    figma.ui.postMessage({ type: 'success', text: 'Deleted ' + removed + ' absolute element(s) ' + searchScope });
+    figma.ui.postMessage({ type: 'success', text: 'Deleted ' + pluralize(removed, 'absolute element') + ' ' + searchScope });
   } else {
     figma.ui.postMessage({ type: 'error', text: 'No absolute elements found ' + searchScope });
   }

@@ -77,6 +77,30 @@ body {
   display: flex;
 }
 
+/* --- selection-only section -------------------------------------------- */
+
+/* Everything below the replace row that only makes sense against a canvas
+   selection. snapkit.js fades this out on entering Replace mode and back in
+   on the way out, then swaps in is-hidden only once the fade has finished —
+   see setSelectionSectionVisible(). 0.2s matches the DS's own button
+   transition timing. flex/column/gap here re-creates the spacing .snapkit's
+   own flex gap gave these elements before they were wrapped. */
+.snapkit-selection-only {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-xxxsmall);
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.snapkit-selection-only.is-fading {
+  opacity: 0;
+}
+
+.snapkit-selection-only.is-hidden {
+  display: none;
+}
+
 /* --- clear button in the search field ------------------------------------- */
 
 /* The X fills the 32px the filled field keeps free on its right. It is hidden
