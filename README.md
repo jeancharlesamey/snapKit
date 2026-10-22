@@ -1,4 +1,4 @@
-# SnapKit v1.0.8-alpha
+# SnapKit v1.0.9-alpha
 
 A Figma plugin for finding elements fast and putting them where they belong / search by name, type and visibility, then set absolute positioning, align, duplicate or clean up in one click, or CMD+SHIFT+R to replace by the copied elements.
 
@@ -262,6 +262,15 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 
 ## RELEASE NOTES
 
+### v1.0.9-alpha
+**UI Changes:**
+- Replace mode takes several find/replace pairs. Pasting multiple lines into a find or replace field spreads them over one pair per line, with a toast confirming the split. Each replace field has a **+** to its right that adds a pair underneath (it turns into an **x** on an empty pair and deletes it), extra fields show a delete button on hover, and a **Reset** link next to *Selection* clears everything once there are two or more pairs
+- A → now precedes the replacement text, and **Replace all** is full width
+
+**Improvements:**
+- All pairs are applied in one pass per name or text, so a replacement is never searched again (A→B then B→C won't turn A into C). The longest find text wins when one contains another
+- `python3 scripts/build-ui.py` rebuilds `ui.html` on machines without Node
+
 ### v1.0.8-alpha
 **UI Changes:**
 - Turning Replace mode on now fades out the visibility radios, *Select* / *Select absolute* and the whole **Actions** block — none of them act on a canvas selection, which Replace mode doesn't use. They fade back in on the way out. The panel only resizes down once the fade has actually finished, so the collapse doesn't clip content mid-transition
@@ -409,4 +418,4 @@ For issues or feedback, please contact the plugin maintainer via GitHub.
 
 ---
 
-**Current Version**: v1.0.8-alpha
+**Current Version**: v1.0.9-alpha

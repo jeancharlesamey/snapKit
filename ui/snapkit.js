@@ -339,6 +339,20 @@ selectAbsoluteBtn.onclick = function() {
 // replace gives two pairs. A text input would flatten the newlines, hence the
 // paste handler.
 var extraPairs = [];
+var resetPairsBtn = document.getElementById('resetPairsBtn');
+
+// Reset only means something once there is more than one pair to clear.
+function syncResetButton() {
+  resetPairsBtn.classList.toggle('is-visible', extraPairs.length >= 1);
+}
+
+resetPairsBtn.onclick = function() {
+  clearExtraPairs();
+  frameNameInput.value = '';
+  replaceWithInput.value = '';
+  frameNameInput.focus();
+  resizeToFitContent();
+};
 
 function makeInput(placeholder) {
   var input = document.createElement('input');
@@ -399,6 +413,7 @@ function addExtraPair(index) {
     box.insertBefore(del, box.querySelector('input'));
   });
   extraPairs.splice(index, 0, pair);
+  syncResetButton();
   replaceExtra.insertBefore(wrapper, replaceExtra.children[index] || null);
 
   var rowOf = function() { return extraPairs.indexOf(pair) + 1; };
@@ -433,11 +448,13 @@ function insertPairAfter(row) {
 function removeExtraPair(pair) {
   extraPairs.splice(extraPairs.indexOf(pair), 1);
   replaceExtra.removeChild(pair.wrapper);
+  syncResetButton();
   resizeToFitContent();
 }
 
 function clearExtraPairs() {
   while (extraPairs.length) replaceExtra.removeChild(extraPairs.pop().wrapper);
+  syncResetButton();
 }
 
 // Row 0 is the main find/replace fields; row n is extraPairs[n - 1].
@@ -450,8 +467,10 @@ function pairField(row, column) {
 // getRow is a function because a + can insert pairs above this one later.
 function bindPaste(input, getRow, column) {
   input.addEventListener('paste', function(e) {
-    var text = e.clipboardData ? e.clipboardData.getData('text') : '';
-    var lines = text.replace(/\r\n?/g, '\n').replace(/\n+$/, '').split('\n');
+    var text = e.clipboardData ? (e.clipboardData.getData('text/plain') || e.clipboardData.getData('text')) : '';
+    // \n, \r\n, a lone \r, and the Unicode line/paragraph separators all
+    // count as one line break; trailing breaks are dropped.
+    var lines = text.replace(/(\r\n|\r|\n|\u2028|\u2029)+$/, '').split(/\r\n|\r|\n|\u2028|\u2029/);
     if (lines.length < 2) return;
     e.preventDefault();
     var row = getRow();

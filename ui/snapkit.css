@@ -160,6 +160,29 @@ body {
   cursor: pointer;
 }
 
+/* Text button next to the Selection title; snapkit.js adds is-visible while
+   there are 2 or more find/replace pairs. */
+/* The DS has no orange token, so this one colour is a literal. The type matches
+   .section-title so it reads as the title's own action. */
+.snapkit-reset {
+  display: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #f2800d;
+  font-family: inherit;
+  font-size: var(--font-size-xsmall);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--font-letter-spacing-pos-xsmall);
+  line-height: var(--line-height);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.snapkit-reset.is-visible {
+  display: inline;
+}
+
 /* --- visibility radios ---------------------------------------------------- */
 
 /* One line, three even columns. The circles themselves need DS surgery to line

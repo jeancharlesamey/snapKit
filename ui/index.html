@@ -25,7 +25,11 @@
          in the type filter dropdown: it isn't a type filter, it's its own mode
          that widens the search to text content, so it gets its own toggle. -->
     <div class="snapkit-row snapkit-row--split">
-      <div class="section-title">Selection <span id="selectionCount">(0)</span></div>
+      <div class="snapkit-row">
+        <div class="section-title">Selection <span id="selectionCount">(0)</span></div>
+        <!-- Only shown once there are 2 or more find/replace pairs. -->
+        <button id="resetPairsBtn" class="snapkit-reset" type="button" title="Clear every find/replace field">Reset</button>
+      </div>
       <button id="replaceToggleBtn" class="icon-button snapkit-replace-toggle" type="button" title="Replace">
         <div class="icon icon--text-replacement"></div>
       </button>
