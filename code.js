@@ -209,18 +209,40 @@ function escapeRegExp(str) {
   return str.replace(/[.*+^${}()|[\]\\]/g, '\\$&');
 }
 
-function containsSubstring(haystack, needle) {
-  return haystack.toLowerCase().indexOf(needle.toLowerCase()) !== -1;
+// Several find/replace pairs run as ONE pass over each string — a single
+// alternation regex — so a replacement is never itself searched again
+// (A->B then B->C must not turn A into C). Longest needle first, so "Jean"
+// can't shadow "Jean-Charles"; on duplicate needles the first pair wins.
+function buildMatcher(pairs) {
+  var map = {};
+  var needles = [];
+  pairs.forEach(function(pair) {
+    var key = pair.find.toLowerCase();
+    if (!(key in map)) {
+      map[key] = pair.replace;
+      needles.push(pair.find);
+    }
+  });
+  needles.sort(function(a, b) { return b.length - a.length; });
+  return { source: needles.map(escapeRegExp).join('|'), map: map };
 }
 
-function replaceAllOccurrences(haystack, needle, replacement) {
-  var re = new RegExp(escapeRegExp(needle), 'gi');
-  return haystack.replace(re, replacement);
+function matcherRegExp(matcher) {
+  return new RegExp(matcher.source, 'gi');
 }
 
-function countOccurrences(haystack, needle) {
-  var re = new RegExp(escapeRegExp(needle), 'gi');
-  var found = haystack.match(re);
+function containsMatch(haystack, matcher) {
+  return matcherRegExp(matcher).test(haystack);
+}
+
+function replaceAllOccurrences(haystack, matcher) {
+  return haystack.replace(matcherRegExp(matcher), function(found) {
+    return matcher.map[found.toLowerCase()];
+  });
+}
+
+function countOccurrences(haystack, matcher) {
+  var found = haystack.match(matcherRegExp(matcher));
   return found ? found.length : 0;
 }
 
@@ -241,18 +263,18 @@ function replaceScopeLabel(scope) {
 
 // Find every match in scope. The container itself counts as a candidate,
 // same as the name search above.
-function findReplaceMatches(container, needle, visibility, scope, results) {
+function findReplaceMatches(container, matcher, visibility, scope, results) {
   var check = function(node) {
     if (!matchesVisibilityFilter(node, visibility)) return;
     var nameMatch = false;
     var contentMatch = false;
     if (scope === 'structure') {
-      nameMatch = (node.type === 'FRAME' || node.type === 'SECTION') && containsSubstring(node.name, needle);
+      nameMatch = (node.type === 'FRAME' || node.type === 'SECTION') && containsMatch(node.name, matcher);
     } else if (scope === 'text') {
-      contentMatch = node.type === 'TEXT' && 'characters' in node && containsSubstring(node.characters, needle);
+      contentMatch = node.type === 'TEXT' && 'characters' in node && containsMatch(node.characters, matcher);
     } else {
-      nameMatch = containsSubstring(node.name, needle);
-      contentMatch = node.type === 'TEXT' && 'characters' in node && containsSubstring(node.characters, needle);
+      nameMatch = containsMatch(node.name, matcher);
+      contentMatch = node.type === 'TEXT' && 'characters' in node && containsMatch(node.characters, matcher);
     }
     if (nameMatch || contentMatch) {
       results.push({ node: node, nameMatch: nameMatch, contentMatch: contentMatch });
@@ -271,18 +293,18 @@ function loadFontsForTextNode(node) {
 
 // Renaming is synchronous, same as everywhere else in the plugin. Editing text
 // content needs the font-load step above, so this — and only this — is async.
-function replaceOne(match, needle, replacement) {
+function replaceOne(match, matcher) {
   var occurrences = 0;
   if (match.nameMatch) {
-    occurrences += countOccurrences(match.node.name, needle);
-    match.node.name = replaceAllOccurrences(match.node.name, needle, replacement);
+    occurrences += countOccurrences(match.node.name, matcher);
+    match.node.name = replaceAllOccurrences(match.node.name, matcher);
   }
   if (!match.contentMatch) {
     return Promise.resolve(occurrences);
   }
   return loadFontsForTextNode(match.node).then(function() {
-    occurrences += countOccurrences(match.node.characters, needle);
-    match.node.characters = replaceAllOccurrences(match.node.characters, needle, replacement);
+    occurrences += countOccurrences(match.node.characters, matcher);
+    match.node.characters = replaceAllOccurrences(match.node.characters, matcher);
     return occurrences;
   });
 }
@@ -290,11 +312,18 @@ function replaceOne(match, needle, replacement) {
 // Replace every match found — whole page, or the current selection, same as
 // every other search/select action. One sweep, one result message; no
 // per-match stepping.
-function replaceAll(nameInput, replaceWith, visibility, scope) {
+// extraPairs ({find, replace}) are the additional rows beyond the main
+// find/replace fields; rows with nothing to find are skipped.
+function replaceAll(nameInput, replaceWith, visibility, scope, extraPairs) {
   visibility = normalizeVisibilityFilter(visibility);
   scope = normalizeReplaceScope(scope);
   var needle = (nameInput || '').trim();
-  var replacement = replaceWith || '';
+  var pairs = [{ find: needle, replace: replaceWith || '' }];
+  (extraPairs || []).forEach(function(pair) {
+    var find = ((pair && pair.find) || '').trim();
+    if (find) pairs.push({ find: find, replace: pair.replace || '' });
+  });
+  var matcher = buildMatcher(pairs);
 
   if (!needle) {
     figma.ui.postMessage({ type: 'error', text: 'Please enter text to find' });
@@ -308,11 +337,11 @@ function replaceAll(nameInput, replaceWith, visibility, scope) {
 
   var matches = [];
   for (var i = 0; i < itemsToSearch.length; i++) {
-    findReplaceMatches(itemsToSearch[i], needle, visibility, scope, matches);
+    findReplaceMatches(itemsToSearch[i], matcher, visibility, scope, matches);
   }
 
   if (matches.length === 0) {
-    figma.ui.postMessage({ type: 'error', text: 'No matches for "' + needle + '" found ' + searchScope + scopeLabel });
+    figma.ui.postMessage({ type: 'error', text: 'No matches for ' + pairs.map(function(p) { return '"' + p.find + '"'; }).join(', ') + ' found ' + searchScope + scopeLabel });
     return;
   }
 
@@ -323,7 +352,7 @@ function replaceAll(nameInput, replaceWith, visibility, scope) {
   var chain = Promise.resolve({ occurrences: 0, nodes: [], failed: 0 });
   matches.forEach(function(match) {
     chain = chain.then(function(result) {
-      return replaceOne(match, needle, replacement).then(function(count) {
+      return replaceOne(match, matcher).then(function(count) {
         result.occurrences += count;
         result.nodes.push(match.node);
         return result;
@@ -869,7 +898,7 @@ figma.ui.onmessage = function(msg) {
   } else if (msg.type === 'remove-absolute') {
     removeAbsoluteComponents();
   } else if (msg.type === 'replace-all') {
-    replaceAll(msg.name, msg.replaceWith, msg.visibility, msg.scope);
+    replaceAll(msg.name, msg.replaceWith, msg.visibility, msg.scope, msg.extraPairs);
   } else if (msg.type === 'clear-selection') {
     figma.currentPage.selection = [];
   } else if (msg.type === 'resize') {

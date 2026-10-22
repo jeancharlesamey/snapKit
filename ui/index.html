@@ -71,11 +71,22 @@
     <!-- Only shown while Replace mode is on. Unlike the name field, this is a
          literal, case-insensitive substring — no *, no comma list — to match
          how Figma's own Find and replace works. -->
-    <div class="snapkit-row snapkit-replace-row" id="replaceRow">
-      <div class="input snapkit-row__grow">
-        <input id="replaceWith" type="text" class="input__field" placeholder="Replace with...">
+    <!-- Pasting several lines into a find or replace field spreads them over
+         one find/replace pair per line: the first pair is the fields above,
+         the rest are added to #replaceExtra by snapkit.js, as are the ones the
+         + buttons insert. -->
+    <div class="snapkit-replace-row" id="replaceRow">
+      <div class="snapkit-row">
+        <div class="input snapkit-row__grow snapkit-replace-field">
+          <span class="snapkit-replace-arrow">→</span>
+          <input id="replaceWith" type="text" class="input__field" placeholder="Replace with...">
+        </div>
+        <button id="addPairBtn" class="icon-button snapkit-pair-plus" type="button" title="Add a find/replace pair">
+          <div class="icon icon--plus"></div>
+        </button>
       </div>
-      <button id="replaceAllBtn" class="button button--primary">Replace all</button>
+      <div class="snapkit-replace-extra" id="replaceExtra"></div>
+      <button id="replaceAllBtn" class="button button--primary snapkit-replace-all">Replace all</button>
     </div>
 
     <!-- None of this applies once Replace mode is on — it all acts on a canvas

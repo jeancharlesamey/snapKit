@@ -169,6 +169,13 @@ body {
   filter: none;
 }
 
+/* Room for the → that sits before the replacement text. Same weight as the
+   rule below that resets the padding once the field is filled. */
+.snapkit-replace-field .input__field,
+.snapkit-replace-field .input__field:not(:placeholder-shown) {
+  padding-left: var(--size-medium);
+}
+
 /* Once something is typed the magnifier is noise: hide it, hand the text the
    32px it was reserving on the left, and reserve the same on the right for the
    clear button that takes its place. */
@@ -198,6 +205,41 @@ body {
    whole hover state. */
 .snapkit-clear:hover .icon {
   filter: none;
+}
+
+/* --- add / remove pair button --------------------------------------------- */
+
+/* On an extra pair whose two fields are both empty the + deletes the pair
+   instead of adding one; snapkit.js marks that state with is-delete, and the
+   45° turn turns the + into an x so the hover says so. */
+.snapkit-pair-plus .icon {
+  transition: transform 0.15s ease;
+}
+
+.snapkit-pair-plus.is-delete:hover .icon {
+  transform: rotate(45deg);
+}
+
+/* The delete button inside an extra pair's fields: the same + as the add
+   button, turned 45 degrees. Static and fully opaque for the same reason the
+   clear button's icon is; the field keeps clear of it on the right while it
+   shows. */
+.input:hover > .snapkit-pair-delete {
+  display: flex;
+}
+
+.input:hover > .snapkit-pair-delete ~ .input__field {
+  padding-right: var(--size-medium);
+}
+
+.snapkit-pair-delete .icon {
+  position: static;
+  opacity: 0.3;
+  transform: rotate(45deg);
+}
+
+.snapkit-pair-delete:hover .icon {
+  opacity: 1;
 }
 
 /* --- visibility radios ---------------------------------------------------- */

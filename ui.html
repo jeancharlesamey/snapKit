@@ -2198,6 +2198,13 @@ body {
   filter: none;
 }
 
+/* Room for the → that sits before the replacement text. Same weight as the
+   rule below that resets the padding once the field is filled. */
+.snapkit-replace-field .input__field,
+.snapkit-replace-field .input__field:not(:placeholder-shown) {
+  padding-left: var(--size-medium);
+}
+
 /* Once something is typed the magnifier is noise: hide it, hand the text the
    32px it was reserving on the left, and reserve the same on the right for the
    clear button that takes its place. */
@@ -2227,6 +2234,41 @@ body {
    whole hover state. */
 .snapkit-clear:hover .icon {
   filter: none;
+}
+
+/* --- add / remove pair button --------------------------------------------- */
+
+/* On an extra pair whose two fields are both empty the + deletes the pair
+   instead of adding one; snapkit.js marks that state with is-delete, and the
+   45° turn turns the + into an x so the hover says so. */
+.snapkit-pair-plus .icon {
+  transition: transform 0.15s ease;
+}
+
+.snapkit-pair-plus.is-delete:hover .icon {
+  transform: rotate(45deg);
+}
+
+/* The delete button inside an extra pair's fields: the same + as the add
+   button, turned 45 degrees. Static and fully opaque for the same reason the
+   clear button's icon is; the field keeps clear of it on the right while it
+   shows. */
+.input:hover > .snapkit-pair-delete {
+  display: flex;
+}
+
+.input:hover > .snapkit-pair-delete ~ .input__field {
+  padding-right: var(--size-medium);
+}
+
+.snapkit-pair-delete .icon {
+  position: static;
+  opacity: 0.3;
+  transform: rotate(45deg);
+}
+
+.snapkit-pair-delete:hover .icon {
+  opacity: 1;
 }
 
 /* --- visibility radios ---------------------------------------------------- */
@@ -2357,6 +2399,42 @@ body {
 
 .snapkit-replace-row.is-visible {
   display: flex;
+  flex-direction: column;
+  gap: var(--size-xxxsmall);
+}
+
+/* One find field + one replace field per extra pair, stacked like the main
+   pair above. */
+.snapkit-replace-extra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-xxxsmall);
+}
+
+.snapkit-replace-extra-pair {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-xxxsmall);
+}
+
+.snapkit-replace-extra:empty {
+  display: none;
+}
+
+/* The arrow before the replacement text. Absolutely positioned like the DS's
+   own icons inside a field; the matching left padding on the field itself is
+   in ds-overrides.css. */
+.snapkit-replace-arrow {
+  position: absolute;
+  top: 0;
+  left: var(--size-xxsmall);
+  line-height: var(--size-medium);
+  color: var(--black3);
+  pointer-events: none;
+}
+
+.snapkit-replace-all {
+  width: 100%;
 }
 
 /* --- selection-only section -------------------------------------------- */
@@ -2389,6 +2467,24 @@ body {
    until there is something to clear — that half of the swap needs the field's
    :placeholder-shown state, so it sits in ds-overrides.css. */
 .snapkit-clear {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-medium);
+  height: var(--size-medium);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+/* Shown inside an extra pair's fields while the pointer is over them (the
+   hover rule is in ds-overrides.css, which owns anything keyed on .input).
+   Deletes the whole pair — find and replace together. */
+.snapkit-pair-delete {
   display: none;
   position: absolute;
   top: 0;
@@ -2601,11 +2697,22 @@ body {
     <!-- Only shown while Replace mode is on. Unlike the name field, this is a
          literal, case-insensitive substring — no *, no comma list — to match
          how Figma's own Find and replace works. -->
-    <div class="snapkit-row snapkit-replace-row" id="replaceRow">
-      <div class="input snapkit-row__grow">
-        <input id="replaceWith" type="text" class="input__field" placeholder="Replace with...">
+    <!-- Pasting several lines into a find or replace field spreads them over
+         one find/replace pair per line: the first pair is the fields above,
+         the rest are added to #replaceExtra by snapkit.js, as are the ones the
+         + buttons insert. -->
+    <div class="snapkit-replace-row" id="replaceRow">
+      <div class="snapkit-row">
+        <div class="input snapkit-row__grow snapkit-replace-field">
+          <span class="snapkit-replace-arrow">→</span>
+          <input id="replaceWith" type="text" class="input__field" placeholder="Replace with...">
+        </div>
+        <button id="addPairBtn" class="icon-button snapkit-pair-plus" type="button" title="Add a find/replace pair">
+          <div class="icon icon--plus"></div>
+        </button>
       </div>
-      <button id="replaceAllBtn" class="button button--primary">Replace all</button>
+      <div class="snapkit-replace-extra" id="replaceExtra"></div>
+      <button id="replaceAllBtn" class="button button--primary snapkit-replace-all">Replace all</button>
     </div>
 
     <!-- None of this applies once Replace mode is on — it all acts on a canvas
@@ -2715,6 +2822,7 @@ var selectionCount = document.getElementById('selectionCount');
 var replaceRow = document.getElementById('replaceRow');
 var replaceWithInput = document.getElementById('replaceWith');
 var replaceAllBtn = document.getElementById('replaceAllBtn');
+var replaceExtra = document.getElementById('replaceExtra');
 var replaceToggleBtn = document.getElementById('replaceToggleBtn');
 var selectionOnlySection = document.getElementById('selectionOnlySection');
 var selectionSectionHideTimer = null;
@@ -2831,6 +2939,7 @@ function setReplaceMode(active) {
   if (!active) {
     frameNameInput.value = '';
     replaceWithInput.value = '';
+    clearExtraPairs();
   }
   updateFilterLabels();
   // Refresh which dropdown item shows as selected, and the filter icon's dot
@@ -3000,6 +3109,143 @@ selectAbsoluteBtn.onclick = function() {
 
 // --- replace ------------------------------------------------------------
 
+// Extra find/replace pairs. Pasting several lines into any find or replace
+// field fills that column downwards, one line per pair, adding rows as needed
+// — so "Thomas\nCharles" into find and "Jean-Thomas\nJean-Charles" into
+// replace gives two pairs. A text input would flatten the newlines, hence the
+// paste handler.
+var extraPairs = [];
+
+function makeInput(placeholder) {
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'input__field';
+  input.placeholder = placeholder;
+  return input;
+}
+
+// Inserts a new empty pair right under extraPairs[index - 1] (index 0 = right
+// under the main fields).
+function addExtraPair(index) {
+  if (index === undefined) index = extraPairs.length;
+  var findInput = makeInput('Text to find...');
+  var replaceInput = makeInput('Replace with...');
+
+  var findBox = document.createElement('div');
+  findBox.className = 'input';
+  findBox.appendChild(findInput);
+
+  var arrow = document.createElement('span');
+  arrow.className = 'snapkit-replace-arrow';
+  arrow.textContent = '→';
+  var replaceBox = document.createElement('div');
+  replaceBox.className = 'input snapkit-row__grow snapkit-replace-field';
+  replaceBox.appendChild(arrow);
+  replaceBox.appendChild(replaceInput);
+
+  var plus = document.createElement('button');
+  plus.type = 'button';
+  plus.className = 'icon-button snapkit-pair-plus';
+  plus.title = 'Add a find/replace pair';
+  var plusIcon = document.createElement('div');
+  plusIcon.className = 'icon icon--plus';
+  plus.appendChild(plusIcon);
+
+  var replaceRowEl = document.createElement('div');
+  replaceRowEl.className = 'snapkit-row';
+  replaceRowEl.appendChild(replaceBox);
+  replaceRowEl.appendChild(plus);
+
+  var wrapper = document.createElement('div');
+  wrapper.className = 'snapkit-replace-extra-pair';
+  wrapper.appendChild(findBox);
+  wrapper.appendChild(replaceRowEl);
+
+  var pair = { wrapper: wrapper, find: findInput, replace: replaceInput };
+  [findBox, replaceBox].forEach(function(box) {
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'snapkit-pair-delete';
+    del.title = 'Delete this pair';
+    var delIcon = document.createElement('div');
+    delIcon.className = 'icon icon--plus';
+    del.appendChild(delIcon);
+    del.onclick = function() { removeExtraPair(pair); };
+    // Before the input so the css can reach the field with a sibling selector.
+    box.insertBefore(del, box.querySelector('input'));
+  });
+  extraPairs.splice(index, 0, pair);
+  replaceExtra.insertBefore(wrapper, replaceExtra.children[index] || null);
+
+  var rowOf = function() { return extraPairs.indexOf(pair) + 1; };
+  bindPaste(findInput, rowOf, 'find');
+  bindPaste(replaceInput, rowOf, 'replace');
+  // While both fields are empty this + deletes the pair instead (the css
+  // turns it into an x on hover).
+  var isEmpty = function() { return !findInput.value && !replaceInput.value; };
+  var syncPlus = function() {
+    var empty = isEmpty();
+    plus.classList.toggle('is-delete', empty);
+    plus.title = empty ? 'Delete this empty pair' : 'Add a find/replace pair';
+  };
+  findInput.addEventListener('input', syncPlus);
+  replaceInput.addEventListener('input', syncPlus);
+  plus.onclick = function() {
+    if (isEmpty()) removeExtraPair(pair);
+    else insertPairAfter(rowOf());
+  };
+  pair.sync = syncPlus;
+  syncPlus();
+  return pair;
+}
+
+// row is the pair the + was pressed on (0 = the main fields).
+function insertPairAfter(row) {
+  var pair = addExtraPair(row);
+  pair.find.focus();
+  resizeToFitContent();
+}
+
+function removeExtraPair(pair) {
+  extraPairs.splice(extraPairs.indexOf(pair), 1);
+  replaceExtra.removeChild(pair.wrapper);
+  resizeToFitContent();
+}
+
+function clearExtraPairs() {
+  while (extraPairs.length) replaceExtra.removeChild(extraPairs.pop().wrapper);
+}
+
+// Row 0 is the main find/replace fields; row n is extraPairs[n - 1].
+function pairField(row, column) {
+  if (row === 0) return column === 'find' ? frameNameInput : replaceWithInput;
+  while (extraPairs.length < row) addExtraPair();
+  return extraPairs[row - 1][column];
+}
+
+// getRow is a function because a + can insert pairs above this one later.
+function bindPaste(input, getRow, column) {
+  input.addEventListener('paste', function(e) {
+    var text = e.clipboardData ? e.clipboardData.getData('text') : '';
+    var lines = text.replace(/\r\n?/g, '\n').replace(/\n+$/, '').split('\n');
+    if (lines.length < 2) return;
+    e.preventDefault();
+    var row = getRow();
+    for (var i = 0; i < lines.length; i++) {
+      pairField(row + i, column).value = lines[i];
+    }
+    extraPairs.forEach(function(pair) { pair.sync(); });
+    // Confirms the split: the pasted lines landed one per pair.
+    var total = extraPairs.length + 1;
+    showMessage('Split into ' + total + ' find / replace pairs', 'success');
+    resizeToFitContent();
+  });
+}
+
+bindPaste(frameNameInput, function() { return 0; }, 'find');
+bindPaste(replaceWithInput, function() { return 0; }, 'replace');
+document.getElementById('addPairBtn').onclick = function() { insertPairAfter(0); };
+
 replaceAllBtn.onclick = function() {
   // Reuses the name field as the "find" text — the new field only holds the
   // replacement — so this is the same empty-input guard selectBtn uses.
@@ -3009,7 +3255,12 @@ replaceAllBtn.onclick = function() {
     return;
   }
   showOverlay(replaceContextText(findText, replaceWithInput.value));
-  parent.postMessage({ pluginMessage: { type: 'replace-all', name: findText, replaceWith: replaceWithInput.value, visibility: visibilityFilter, scope: replaceScope } }, '*');
+  var message = { type: 'replace-all', name: findText, replaceWith: replaceWithInput.value, visibility: visibilityFilter, scope: replaceScope };
+  var extras = extraPairs
+    .map(function(pair) { return { find: pair.find.value.trim(), replace: pair.replace.value }; })
+    .filter(function(pair) { return pair.find; });
+  if (extras.length) message.extraPairs = extras;
+  parent.postMessage({ pluginMessage: message }, '*');
 };
 
 // --- actions ----------------------------------------------------------------

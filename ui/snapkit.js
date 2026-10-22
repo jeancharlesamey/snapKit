@@ -46,6 +46,7 @@ var selectionCount = document.getElementById('selectionCount');
 var replaceRow = document.getElementById('replaceRow');
 var replaceWithInput = document.getElementById('replaceWith');
 var replaceAllBtn = document.getElementById('replaceAllBtn');
+var replaceExtra = document.getElementById('replaceExtra');
 var replaceToggleBtn = document.getElementById('replaceToggleBtn');
 var selectionOnlySection = document.getElementById('selectionOnlySection');
 var selectionSectionHideTimer = null;
@@ -162,6 +163,7 @@ function setReplaceMode(active) {
   if (!active) {
     frameNameInput.value = '';
     replaceWithInput.value = '';
+    clearExtraPairs();
   }
   updateFilterLabels();
   // Refresh which dropdown item shows as selected, and the filter icon's dot
@@ -331,6 +333,143 @@ selectAbsoluteBtn.onclick = function() {
 
 // --- replace ------------------------------------------------------------
 
+// Extra find/replace pairs. Pasting several lines into any find or replace
+// field fills that column downwards, one line per pair, adding rows as needed
+// — so "Thomas\nCharles" into find and "Jean-Thomas\nJean-Charles" into
+// replace gives two pairs. A text input would flatten the newlines, hence the
+// paste handler.
+var extraPairs = [];
+
+function makeInput(placeholder) {
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'input__field';
+  input.placeholder = placeholder;
+  return input;
+}
+
+// Inserts a new empty pair right under extraPairs[index - 1] (index 0 = right
+// under the main fields).
+function addExtraPair(index) {
+  if (index === undefined) index = extraPairs.length;
+  var findInput = makeInput('Text to find...');
+  var replaceInput = makeInput('Replace with...');
+
+  var findBox = document.createElement('div');
+  findBox.className = 'input';
+  findBox.appendChild(findInput);
+
+  var arrow = document.createElement('span');
+  arrow.className = 'snapkit-replace-arrow';
+  arrow.textContent = '→';
+  var replaceBox = document.createElement('div');
+  replaceBox.className = 'input snapkit-row__grow snapkit-replace-field';
+  replaceBox.appendChild(arrow);
+  replaceBox.appendChild(replaceInput);
+
+  var plus = document.createElement('button');
+  plus.type = 'button';
+  plus.className = 'icon-button snapkit-pair-plus';
+  plus.title = 'Add a find/replace pair';
+  var plusIcon = document.createElement('div');
+  plusIcon.className = 'icon icon--plus';
+  plus.appendChild(plusIcon);
+
+  var replaceRowEl = document.createElement('div');
+  replaceRowEl.className = 'snapkit-row';
+  replaceRowEl.appendChild(replaceBox);
+  replaceRowEl.appendChild(plus);
+
+  var wrapper = document.createElement('div');
+  wrapper.className = 'snapkit-replace-extra-pair';
+  wrapper.appendChild(findBox);
+  wrapper.appendChild(replaceRowEl);
+
+  var pair = { wrapper: wrapper, find: findInput, replace: replaceInput };
+  [findBox, replaceBox].forEach(function(box) {
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'snapkit-pair-delete';
+    del.title = 'Delete this pair';
+    var delIcon = document.createElement('div');
+    delIcon.className = 'icon icon--plus';
+    del.appendChild(delIcon);
+    del.onclick = function() { removeExtraPair(pair); };
+    // Before the input so the css can reach the field with a sibling selector.
+    box.insertBefore(del, box.querySelector('input'));
+  });
+  extraPairs.splice(index, 0, pair);
+  replaceExtra.insertBefore(wrapper, replaceExtra.children[index] || null);
+
+  var rowOf = function() { return extraPairs.indexOf(pair) + 1; };
+  bindPaste(findInput, rowOf, 'find');
+  bindPaste(replaceInput, rowOf, 'replace');
+  // While both fields are empty this + deletes the pair instead (the css
+  // turns it into an x on hover).
+  var isEmpty = function() { return !findInput.value && !replaceInput.value; };
+  var syncPlus = function() {
+    var empty = isEmpty();
+    plus.classList.toggle('is-delete', empty);
+    plus.title = empty ? 'Delete this empty pair' : 'Add a find/replace pair';
+  };
+  findInput.addEventListener('input', syncPlus);
+  replaceInput.addEventListener('input', syncPlus);
+  plus.onclick = function() {
+    if (isEmpty()) removeExtraPair(pair);
+    else insertPairAfter(rowOf());
+  };
+  pair.sync = syncPlus;
+  syncPlus();
+  return pair;
+}
+
+// row is the pair the + was pressed on (0 = the main fields).
+function insertPairAfter(row) {
+  var pair = addExtraPair(row);
+  pair.find.focus();
+  resizeToFitContent();
+}
+
+function removeExtraPair(pair) {
+  extraPairs.splice(extraPairs.indexOf(pair), 1);
+  replaceExtra.removeChild(pair.wrapper);
+  resizeToFitContent();
+}
+
+function clearExtraPairs() {
+  while (extraPairs.length) replaceExtra.removeChild(extraPairs.pop().wrapper);
+}
+
+// Row 0 is the main find/replace fields; row n is extraPairs[n - 1].
+function pairField(row, column) {
+  if (row === 0) return column === 'find' ? frameNameInput : replaceWithInput;
+  while (extraPairs.length < row) addExtraPair();
+  return extraPairs[row - 1][column];
+}
+
+// getRow is a function because a + can insert pairs above this one later.
+function bindPaste(input, getRow, column) {
+  input.addEventListener('paste', function(e) {
+    var text = e.clipboardData ? e.clipboardData.getData('text') : '';
+    var lines = text.replace(/\r\n?/g, '\n').replace(/\n+$/, '').split('\n');
+    if (lines.length < 2) return;
+    e.preventDefault();
+    var row = getRow();
+    for (var i = 0; i < lines.length; i++) {
+      pairField(row + i, column).value = lines[i];
+    }
+    extraPairs.forEach(function(pair) { pair.sync(); });
+    // Confirms the split: the pasted lines landed one per pair.
+    var total = extraPairs.length + 1;
+    showMessage('Split into ' + total + ' find / replace pairs', 'success');
+    resizeToFitContent();
+  });
+}
+
+bindPaste(frameNameInput, function() { return 0; }, 'find');
+bindPaste(replaceWithInput, function() { return 0; }, 'replace');
+document.getElementById('addPairBtn').onclick = function() { insertPairAfter(0); };
+
 replaceAllBtn.onclick = function() {
   // Reuses the name field as the "find" text — the new field only holds the
   // replacement — so this is the same empty-input guard selectBtn uses.
@@ -340,7 +479,12 @@ replaceAllBtn.onclick = function() {
     return;
   }
   showOverlay(replaceContextText(findText, replaceWithInput.value));
-  parent.postMessage({ pluginMessage: { type: 'replace-all', name: findText, replaceWith: replaceWithInput.value, visibility: visibilityFilter, scope: replaceScope } }, '*');
+  var message = { type: 'replace-all', name: findText, replaceWith: replaceWithInput.value, visibility: visibilityFilter, scope: replaceScope };
+  var extras = extraPairs
+    .map(function(pair) { return { find: pair.find.value.trim(), replace: pair.replace.value }; })
+    .filter(function(pair) { return pair.find; });
+  if (extras.length) message.extraPairs = extras;
+  parent.postMessage({ pluginMessage: message }, '*');
 };
 
 // --- actions ----------------------------------------------------------------

@@ -60,6 +60,42 @@ body {
 
 .snapkit-replace-row.is-visible {
   display: flex;
+  flex-direction: column;
+  gap: var(--size-xxxsmall);
+}
+
+/* One find field + one replace field per extra pair, stacked like the main
+   pair above. */
+.snapkit-replace-extra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-xxxsmall);
+}
+
+.snapkit-replace-extra-pair {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-xxxsmall);
+}
+
+.snapkit-replace-extra:empty {
+  display: none;
+}
+
+/* The arrow before the replacement text. Absolutely positioned like the DS's
+   own icons inside a field; the matching left padding on the field itself is
+   in ds-overrides.css. */
+.snapkit-replace-arrow {
+  position: absolute;
+  top: 0;
+  left: var(--size-xxsmall);
+  line-height: var(--size-medium);
+  color: var(--black3);
+  pointer-events: none;
+}
+
+.snapkit-replace-all {
+  width: 100%;
 }
 
 /* --- selection-only section -------------------------------------------- */
@@ -92,6 +128,24 @@ body {
    until there is something to clear — that half of the swap needs the field's
    :placeholder-shown state, so it sits in ds-overrides.css. */
 .snapkit-clear {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-medium);
+  height: var(--size-medium);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+/* Shown inside an extra pair's fields while the pointer is over them (the
+   hover rule is in ds-overrides.css, which owns anything keyed on .input).
+   Deletes the whole pair — find and replace together. */
+.snapkit-pair-delete {
   display: none;
   position: absolute;
   top: 0;
