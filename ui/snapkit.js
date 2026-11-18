@@ -37,7 +37,7 @@ var filterLabelEls = {
   component: document.getElementById('filterLabelComponent'),
   'non-component': document.getElementById('filterLabelNonComponent')
 };
-var TYPE_FILTER_LABELS = { all: 'All types', component: 'Components only', 'non-component': 'Everything but components' };
+var TYPE_FILTER_LABELS = { all: 'All types', component: 'All components', 'non-component': 'Everything but components' };
 var REPLACE_SCOPE_LABELS = { all: 'Everywhere', component: 'In section and frames only', 'non-component': 'In text only' };
 var DATA_TYPE_TO_REPLACE_SCOPE = { all: 'everywhere', component: 'structure', 'non-component': 'text' };
 var REPLACE_SCOPE_TO_DATA_TYPE = { everywhere: 'all', structure: 'component', text: 'non-component' };
@@ -254,8 +254,8 @@ document.body.onclick = closeFilterPopover;
 var TYPE_FILTER_PHRASES = {
   all: 'all types',
   component: 'components only',
-  'local-component': 'local components only',
-  'remote-component': 'remote components outside library only',
+  'local-component': 'components created in this file only',
+  'remote-component': 'components created in another file only',
   'library-component': 'library components only',
   'non-component': 'everything but components'
 };
@@ -323,11 +323,8 @@ function showMessage(text, type) {
 // --- select -----------------------------------------------------------------
 
 selectBtn.onclick = function() {
+  // An empty field means "any name" — the plugin treats it as a wildcard.
   var name = frameNameInput.value.trim();
-  if (!name) {
-    showMessage('Please enter a component name', 'error');
-    return;
-  }
   showOverlay(searchContextText('select', name));
   parent.postMessage({ pluginMessage: { type: 'select-frame', name: name, typeFilter: typeFilter, visibility: visibilityFilter } }, '*');
 };

@@ -796,7 +796,7 @@ test('select-frame typeFilter "local-component" keeps local components and local
   var figma = originFigma(f);
   var msgs = figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'local-component' });
   assert.strictEqual(lastType(msgs), 'success');
-  assert.ok(/local components only/.test(lastText(msgs)), lastText(msgs));
+  assert.ok(/components created in this file only/.test(lastText(msgs)), lastText(msgs));
   assertSelection(figma, [f.local, f.localInst]);
 });
 
@@ -816,7 +816,7 @@ test('select-frame typeFilter "remote-component" keeps remote instances outside 
   var figma = originFigma(f);
   figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'remote-component' });
   return afterAsync(function() {
-    assert.ok(/remote components outside library only/.test(lastText(figma._messages)), lastText(figma._messages));
+    assert.ok(/components created in another file only/.test(lastText(figma._messages)), lastText(figma._messages));
     assertSelection(figma, [f.remoteInst]);
   });
 });
@@ -840,6 +840,14 @@ test('select-absolute honours the origin filters', function() {
   return afterAsync(function() {
     assertSelection(figma, [f.libInst]);
   });
+});
+
+test('select-frame with an empty name acts as a wildcard', function() {
+  var f = makeTypeFixture();
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  var msgs = figma._send({ type: 'select-frame', name: '', typeFilter: 'component' });
+  assert.strictEqual(lastType(msgs), 'success');
+  assertSelection(figma, [f.comp, f.inst]);
 });
 
 runNext(0);

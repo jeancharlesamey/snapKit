@@ -2716,15 +2716,15 @@ body {
             <span class="select-menu__item-icon"></span><span class="select-menu__item-label" id="filterLabelAll">All types</span>
           </div>
           <div class="select-menu__item snapkit-filter__item" data-type="component">
-            <span class="select-menu__item-icon"></span><span class="select-menu__item-label" id="filterLabelComponent">Components only</span>
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label" id="filterLabelComponent">All components</span>
           </div>
           <!-- Component origin filters. Hidden while Replace is on: its 3 slots
                are scopes, and origin means nothing to a text search. -->
           <div class="select-menu__item snapkit-filter__item snapkit-filter__item--origin" data-type="local-component">
-            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Local components</span>
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Created in this file</span>
           </div>
           <div class="select-menu__item snapkit-filter__item snapkit-filter__item--origin" data-type="remote-component">
-            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Remote outside library</span>
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Created in another file</span>
           </div>
           <div class="select-menu__item snapkit-filter__item snapkit-filter__item--origin" data-type="library-component">
             <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Library components</span>
@@ -2855,7 +2855,7 @@ var filterLabelEls = {
   component: document.getElementById('filterLabelComponent'),
   'non-component': document.getElementById('filterLabelNonComponent')
 };
-var TYPE_FILTER_LABELS = { all: 'All types', component: 'Components only', 'non-component': 'Everything but components' };
+var TYPE_FILTER_LABELS = { all: 'All types', component: 'All components', 'non-component': 'Everything but components' };
 var REPLACE_SCOPE_LABELS = { all: 'Everywhere', component: 'In section and frames only', 'non-component': 'In text only' };
 var DATA_TYPE_TO_REPLACE_SCOPE = { all: 'everywhere', component: 'structure', 'non-component': 'text' };
 var REPLACE_SCOPE_TO_DATA_TYPE = { everywhere: 'all', structure: 'component', text: 'non-component' };
@@ -3072,8 +3072,8 @@ document.body.onclick = closeFilterPopover;
 var TYPE_FILTER_PHRASES = {
   all: 'all types',
   component: 'components only',
-  'local-component': 'local components only',
-  'remote-component': 'remote components outside library only',
+  'local-component': 'components created in this file only',
+  'remote-component': 'components created in another file only',
   'library-component': 'library components only',
   'non-component': 'everything but components'
 };
@@ -3141,11 +3141,8 @@ function showMessage(text, type) {
 // --- select -----------------------------------------------------------------
 
 selectBtn.onclick = function() {
+  // An empty field means "any name" — the plugin treats it as a wildcard.
   var name = frameNameInput.value.trim();
-  if (!name) {
-    showMessage('Please enter a component name', 'error');
-    return;
-  }
   showOverlay(searchContextText('select', name));
   parent.postMessage({ pluginMessage: { type: 'select-frame', name: name, typeFilter: typeFilter, visibility: visibilityFilter } }, '*');
 };

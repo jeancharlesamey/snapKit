@@ -90,7 +90,7 @@ var COMPONENT_TYPES = ['COMPONENT', 'COMPONENT_SET', 'INSTANCE'];
 // Origin filters (components only):
 //   'local-component'   created in this file (remote === false)
 //   'remote-component'  not created in this file AND not reachable through a
-//                       published library ("remote outside library")
+//                       published library ("created in another file")
 //   'library-component' not created in this file AND resolvable through a
 //                       published library
 // The API only exposes mainComponent.remote, so telling the last two apart
@@ -184,8 +184,8 @@ function matchesVisibilityFilter(node, visibility) {
 function searchFilterLabel(typeFilter, visibility) {
   var parts = [];
   if (typeFilter === 'component') parts.push('components only');
-  else if (typeFilter === 'local-component') parts.push('local components only');
-  else if (typeFilter === 'remote-component') parts.push('remote components outside library only');
+  else if (typeFilter === 'local-component') parts.push('components created in this file only');
+  else if (typeFilter === 'remote-component') parts.push('components created in another file only');
   else if (typeFilter === 'library-component') parts.push('library components only');
   else if (typeFilter === 'non-component') parts.push('non-component elements only');
   if (visibility === 'visible') parts.push('visible only');
@@ -474,11 +474,7 @@ function selectFrameByName(nameInput, typeFilter, visibility) {
   // Parse comma-separated names and trim whitespace
   var names = nameInput.split(',').map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; });
 
-  if (names.length === 0) {
-    figma.ui.postMessage({ type: 'error', text: 'Please enter at least one component name' });
-    return;
-  }
-
+  // An empty name field acts as a wildcard: no matchers means every name matches.
   var matchers = compileNamePatterns(names);
   var scope = getSearchTargets();
   var framesToSearch = scope.items;
@@ -497,16 +493,17 @@ function selectFrameByName(nameInput, typeFilter, visibility) {
   }
 
   // Create display text for names
-  var namesDisplay = names.length === 1 ? '"' + names[0] + '"' : names.map(function(n) { return '"' + n + '"'; }).join(', ');
+  var namesDisplay = names.length === 0 ? '' : names.length === 1 ? '"' + names[0] + '"' : names.map(function(n) { return '"' + n + '"'; }).join(', ');
+  var namedPart = namesDisplay ? ' named ' + namesDisplay : '';
   var filterLabel = searchFilterLabel(typeFilter, visibility);
 
   refineByLibrary(foundFrames, typeFilter, function(found) {
     if (found.length > 0) {
       figma.currentPage.selection = found;
       figma.viewport.scrollAndZoomIntoView(found);
-      figma.ui.postMessage({ type: 'success', text: 'Found and selected ' + pluralize(found.length, 'element') + ' named ' + namesDisplay + ' ' + searchScope + filterLabel });
+      figma.ui.postMessage({ type: 'success', text: 'Found and selected ' + pluralize(found.length, 'element') + namedPart + ' ' + searchScope + filterLabel });
     } else {
-      figma.ui.postMessage({ type: 'error', text: 'No elements named ' + namesDisplay + ' found ' + searchScope + filterLabel });
+      figma.ui.postMessage({ type: 'error', text: 'No elements' + namedPart + ' found ' + searchScope + filterLabel });
     }
   });
 }
