@@ -100,11 +100,9 @@ function setTypeFilter(value) {
     );
   }
   filterBtn.classList.toggle('is-active', value !== 'all');
-  filterBtn.title = value === 'component'
-    ? 'Selection scope: components only'
-    : value === 'non-component'
-      ? 'Selection scope: everything but components'
-      : 'Filter by selection scope';
+  filterBtn.title = value === 'all'
+    ? 'Filter by selection scope'
+    : 'Selection scope: ' + typeFilterPhrase(value);
 }
 
 // --- replace mode ------------------------------------------------------------
@@ -123,6 +121,11 @@ function updateFilterLabels() {
     filterLabelEls[key].textContent = labels[key];
   }
   filterDividerLabel.textContent = replaceMode ? 'Replace scope' : 'Selection scope';
+  for (var oi = 0; oi < filterOptions.length; oi++) {
+    if (filterOptions[oi].classList.contains('snapkit-filter__item--origin')) {
+      filterOptions[oi].classList.toggle('is-hidden', replaceMode);
+    }
+  }
 }
 
 // Fades .snapkit-selection-only in or out around Replace mode. Hiding waits
@@ -248,12 +251,17 @@ document.body.onclick = closeFilterPopover;
 
 // --- search feedback --------------------------------------------------------
 
-function typeFilterPhrase() {
-  return typeFilter === 'component'
-    ? 'components only'
-    : typeFilter === 'non-component'
-      ? 'everything but components'
-      : 'all types';
+var TYPE_FILTER_PHRASES = {
+  all: 'all types',
+  component: 'components only',
+  'local-component': 'local components only',
+  'remote-component': 'remote components outside library only',
+  'library-component': 'library components only',
+  'non-component': 'everything but components'
+};
+
+function typeFilterPhrase(value) {
+  return TYPE_FILTER_PHRASES[value || typeFilter] || TYPE_FILTER_PHRASES.all;
 }
 
 function visibilityPhrase() {

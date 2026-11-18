@@ -1,4 +1,4 @@
-// SnapKit - Figma Plugin v1.0.9-alpha
+// SnapKit - Figma Plugin v1.1.0-alpha
 // Comprehensive plugin with alignment, absolute positioning, and component selection
 
 // The panel markup lives in ui/ (built into ui.html by npm run build:ui) and is
@@ -87,17 +87,81 @@ function nameMatches(name, matchers) {
 // instances; 'non-component' keeps everything else (frames, groups, text...).
 var COMPONENT_TYPES = ['COMPONENT', 'COMPONENT_SET', 'INSTANCE'];
 
+// Origin filters (components only):
+//   'local-component'   created in this file (remote === false)
+//   'remote-component'  not created in this file AND not reachable through a
+//                       published library ("remote outside library")
+//   'library-component' not created in this file AND resolvable through a
+//                       published library
+// The API only exposes mainComponent.remote, so telling the last two apart
+// takes an async library lookup — see refineByLibrary.
+var ORIGIN_FILTERS = ['local-component', 'remote-component', 'library-component'];
+
+function isOriginFilter(typeFilter) {
+  return ORIGIN_FILTERS.indexOf(typeFilter) !== -1;
+}
+
+function needsLibraryLookup(typeFilter) {
+  return typeFilter === 'remote-component' || typeFilter === 'library-component';
+}
+
 // Accept only the filters we know about, so an unset or stale value from the UI
 // falls back to the permissive default instead of matching nothing.
 function normalizeTypeFilter(typeFilter) {
-  return typeFilter === 'component' || typeFilter === 'non-component' ? typeFilter : 'all';
+  return typeFilter === 'component' || typeFilter === 'non-component' || isOriginFilter(typeFilter) ? typeFilter : 'all';
+}
+
+// The main component of an instance, or null when detached / unavailable.
+function getMainComponent(node) {
+  try {
+    return node.mainComponent || null;
+  } catch (e) {
+    return null;
+  }
 }
 
 function matchesTypeFilter(node, typeFilter) {
   var isComponent = COMPONENT_TYPES.indexOf(node.type) !== -1;
   if (typeFilter === 'component') return isComponent;
   if (typeFilter === 'non-component') return !isComponent;
+  if (isOriginFilter(typeFilter)) {
+    // Components and variant sets defined in the file are local by definition.
+    if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return typeFilter === 'local-component';
+    if (node.type !== 'INSTANCE') return false;
+    var main = getMainComponent(node);
+    if (!main) return false; // detached or deleted main: not an audited component
+    return typeFilter === 'local-component' ? main.remote === false : main.remote === true;
+  }
   return true;
+}
+
+// Second pass for 'remote-component' / 'library-component': every candidate is
+// already known to be remote, so split them by whether their main component
+// still resolves through a published library. One lookup per unique key.
+// Synchronous (done called immediately) for every other filter, so those
+// searches keep reporting in the same tick.
+function refineByLibrary(nodes, typeFilter, done) {
+  if (!needsLibraryLookup(typeFilter) || nodes.length === 0) {
+    done(nodes);
+    return;
+  }
+  var wantLibrary = typeFilter === 'library-component';
+  var cache = {};
+  function inLibrary(key) {
+    if (!(key in cache)) {
+      cache[key] = figma.importComponentByKeyAsync(key).then(function() { return true; }, function() { return false; });
+    }
+    return cache[key];
+  }
+  Promise.all(nodes.map(function(node) {
+    var main = getMainComponent(node);
+    if (!main || !main.key) return false;
+    return inLibrary(main.key);
+  })).then(function(flags) {
+    done(nodes.filter(function(node, i) { return flags[i] === wantLibrary; }));
+  }, function() {
+    done([]);
+  });
 }
 
 // --- visibility filter ------------------------------------------------------
@@ -120,6 +184,9 @@ function matchesVisibilityFilter(node, visibility) {
 function searchFilterLabel(typeFilter, visibility) {
   var parts = [];
   if (typeFilter === 'component') parts.push('components only');
+  else if (typeFilter === 'local-component') parts.push('local components only');
+  else if (typeFilter === 'remote-component') parts.push('remote components outside library only');
+  else if (typeFilter === 'library-component') parts.push('library components only');
   else if (typeFilter === 'non-component') parts.push('non-component elements only');
   if (visibility === 'visible') parts.push('visible only');
   else if (visibility === 'hidden') parts.push('hidden only');
@@ -146,10 +213,22 @@ function isAbsolute(node) {
   return 'layoutPositioning' in node && node.layoutPositioning === 'ABSOLUTE';
 }
 
+// Visit the descendants a type filter could possibly accept. Origin filters
+// only care about components and instances, so the native
+// findAllWithCriteria does the walk; every other filter keeps walkTree.
+function walkCandidates(container, typeFilter, visit) {
+  if (isOriginFilter(typeFilter) && typeof container.findAllWithCriteria === 'function') {
+    var types = typeFilter === 'local-component' ? ['COMPONENT', 'COMPONENT_SET', 'INSTANCE'] : ['INSTANCE'];
+    container.findAllWithCriteria({ types: types }).forEach(visit);
+    return;
+  }
+  walkTree(container, visit);
+}
+
 // Find every descendant matching the compiled name patterns, the type filter
 // and the visibility filter.
 function findByName(container, matchers, results, typeFilter, visibility) {
-  walkTree(container, function(child) {
+  walkCandidates(container, typeFilter, function(child) {
     if (nameMatches(child.name, matchers) && matchesTypeFilter(child, typeFilter) && matchesVisibilityFilter(child, visibility)) {
       results.push(child);
     }
@@ -160,7 +239,7 @@ function findByName(container, matchers, results, typeFilter, visibility) {
 // patterns, the type filter and the visibility filter. Empty matchers means
 // "no name filter" (collects every absolute element in scope).
 function findAbsoluteByName(container, matchers, results, typeFilter, visibility) {
-  walkTree(container, function(child) {
+  walkCandidates(container, typeFilter, function(child) {
     if (isAbsolute(child) && nameMatches(child.name, matchers) && matchesTypeFilter(child, typeFilter) && matchesVisibilityFilter(child, visibility)) {
       results.push(child);
     }
@@ -421,13 +500,15 @@ function selectFrameByName(nameInput, typeFilter, visibility) {
   var namesDisplay = names.length === 1 ? '"' + names[0] + '"' : names.map(function(n) { return '"' + n + '"'; }).join(', ');
   var filterLabel = searchFilterLabel(typeFilter, visibility);
 
-  if (foundFrames.length > 0) {
-    figma.currentPage.selection = foundFrames;
-    figma.viewport.scrollAndZoomIntoView(foundFrames);
-    figma.ui.postMessage({ type: 'success', text: 'Found and selected ' + pluralize(foundFrames.length, 'element') + ' named ' + namesDisplay + ' ' + searchScope + filterLabel });
-  } else {
-    figma.ui.postMessage({ type: 'error', text: 'No elements named ' + namesDisplay + ' found ' + searchScope + filterLabel });
-  }
+  refineByLibrary(foundFrames, typeFilter, function(found) {
+    if (found.length > 0) {
+      figma.currentPage.selection = found;
+      figma.viewport.scrollAndZoomIntoView(found);
+      figma.ui.postMessage({ type: 'success', text: 'Found and selected ' + pluralize(found.length, 'element') + ' named ' + namesDisplay + ' ' + searchScope + filterLabel });
+    } else {
+      figma.ui.postMessage({ type: 'error', text: 'No elements named ' + namesDisplay + ' found ' + searchScope + filterLabel });
+    }
+  });
 }
 
 // Select absolute-positioned components by name within selected frames or all page frames
@@ -458,23 +539,25 @@ function selectAbsoluteByName(nameInput, typeFilter, visibility) {
   }
 
   var filterLabel = searchFilterLabel(typeFilter, visibility);
-  var successText, errorText;
+  var successText, errorText; // successText is built per count, after any library lookup
   if (names.length === 0) {
-    successText = 'Found and selected ' + pluralize(foundFrames.length, 'absolute element') + ' ' + searchScope + filterLabel;
+    successText = function(n) { return 'Found and selected ' + pluralize(n, 'absolute element') + ' ' + searchScope + filterLabel; };
     errorText = 'No absolute elements found ' + searchScope + filterLabel;
   } else {
     var namesDisplay = names.length === 1 ? '"' + names[0] + '"' : names.map(function(n) { return '"' + n + '"'; }).join(', ');
-    successText = 'Found and selected ' + pluralize(foundFrames.length, 'absolute element') + ' named ' + namesDisplay + ' ' + searchScope + filterLabel;
+    successText = function(n) { return 'Found and selected ' + pluralize(n, 'absolute element') + ' named ' + namesDisplay + ' ' + searchScope + filterLabel; };
     errorText = 'No absolute elements named ' + namesDisplay + ' found ' + searchScope + filterLabel;
   }
 
-  if (foundFrames.length > 0) {
-    figma.currentPage.selection = foundFrames;
-    figma.viewport.scrollAndZoomIntoView(foundFrames);
-    figma.ui.postMessage({ type: 'success', text: successText });
-  } else {
-    figma.ui.postMessage({ type: 'error', text: errorText });
-  }
+  refineByLibrary(foundFrames, typeFilter, function(found) {
+    if (found.length > 0) {
+      figma.currentPage.selection = found;
+      figma.viewport.scrollAndZoomIntoView(found);
+      figma.ui.postMessage({ type: 'success', text: successText(found.length) });
+    } else {
+      figma.ui.postMessage({ type: 'error', text: errorText });
+    }
+  });
 }
 
 // Duplicate selected element

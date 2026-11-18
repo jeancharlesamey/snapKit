@@ -771,4 +771,75 @@ test('actions on an empty selection return a helpful error', function() {
   });
 });
 
+// --- component origin filters -------------------------------------------------
+// local: defined in this file; library: remote and still resolvable through a
+// published library; remote: remote but not resolvable ("remote outside library").
+function makeOriginFixture() {
+  var local = mock.makeNode({ name: 'Card', type: 'COMPONENT' });
+  var localInst = mock.makeNode({ name: 'Card', type: 'INSTANCE', mainComponent: { remote: false, key: 'k-local' } });
+  var libInst = mock.makeNode({ name: 'Card', type: 'INSTANCE', mainComponent: { remote: true, key: 'k-lib' } });
+  var remoteInst = mock.makeNode({ name: 'Card', type: 'INSTANCE', mainComponent: { remote: true, key: 'k-gone' } });
+  var detached = mock.makeNode({ name: 'Card', type: 'INSTANCE', mainComponent: null });
+  var frame = mock.makeNode({ name: 'Card', type: 'FRAME' });
+  var screen = mock.makeNode({ name: 'Screen', children: [local, localInst, libInst, remoteInst, detached, frame] });
+  return { screen: screen, local: local, localInst: localInst, libInst: libInst, remoteInst: remoteInst, detached: detached, frame: frame };
+}
+
+function originFigma(f) {
+  var figma = loadPlugin(mock.makeFigma([f.screen]));
+  figma._libraryKeys = ['k-lib'];
+  return figma;
+}
+
+test('select-frame typeFilter "local-component" keeps local components and local instances', function() {
+  var f = makeOriginFixture();
+  var figma = originFigma(f);
+  var msgs = figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'local-component' });
+  assert.strictEqual(lastType(msgs), 'success');
+  assert.ok(/local components only/.test(lastText(msgs)), lastText(msgs));
+  assertSelection(figma, [f.local, f.localInst]);
+});
+
+test('select-frame typeFilter "library-component" keeps remote instances that resolve in a library', function() {
+  var f = makeOriginFixture();
+  var figma = originFigma(f);
+  figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'library-component' });
+  return afterAsync(function() {
+    assert.strictEqual(lastType(figma._messages), 'success');
+    assert.ok(/library components only/.test(lastText(figma._messages)), lastText(figma._messages));
+    assertSelection(figma, [f.libInst]);
+  });
+});
+
+test('select-frame typeFilter "remote-component" keeps remote instances outside any library', function() {
+  var f = makeOriginFixture();
+  var figma = originFigma(f);
+  figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'remote-component' });
+  return afterAsync(function() {
+    assert.ok(/remote components outside library only/.test(lastText(figma._messages)), lastText(figma._messages));
+    assertSelection(figma, [f.remoteInst]);
+  });
+});
+
+test('origin filters report an error when nothing matches', function() {
+  var f = makeOriginFixture();
+  var figma = originFigma(f);
+  figma._libraryKeys = [];
+  figma._send({ type: 'select-frame', name: 'Card', typeFilter: 'library-component' });
+  return afterAsync(function() {
+    assert.strictEqual(lastType(figma._messages), 'error');
+  });
+});
+
+test('select-absolute honours the origin filters', function() {
+  var f = makeOriginFixture();
+  f.libInst.layoutPositioning = 'ABSOLUTE';
+  f.localInst.layoutPositioning = 'ABSOLUTE';
+  var figma = originFigma(f);
+  figma._send({ type: 'select-absolute', name: '', typeFilter: 'library-component' });
+  return afterAsync(function() {
+    assertSelection(figma, [f.libInst]);
+  });
+});
+
 runNext(0);

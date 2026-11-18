@@ -1,4 +1,4 @@
-# SnapKit v1.0.9-alpha
+# SnapKit v1.1.0-alpha
 
 A Figma plugin for finding elements fast and putting them where they belong / search by name, type and visibility, then set absolute positioning, align, duplicate or clean up in one click, or CMD+SHIFT+R to replace by the copied elements.
 
@@ -66,15 +66,20 @@ Type one or more names in the field and press **Select**. Names are comma separa
 **Select absolute** runs the same search but keeps only absolute-positioned elements. Unlike **Select**, it accepts an **empty name field** — that means "every absolute element in scope", which is the quickest way to audit the sticky headers and fixed navigation in a prototype.
 
 ### Selection scope filter
-The **filter icon** next to the name field opens a small menu — the dark HUD menu Figma uses for its own dropdowns — with three choices:
+The **filter icon** next to the name field opens a small menu — the dark HUD menu Figma uses for its own dropdowns — with six choices:
 
 - **All types** (default)
 - **Components only** — components, variant sets and instances
+- **Local components** — created in this file (components, variant sets, and instances of them)
+- **Remote outside library** — instances of a component that was not created in this file and is not reachable through a published library (library disabled, unpublished or deleted)
+- **Library components** — instances of a component from a published library
 - **Everything but components** — frames, groups, text, shapes…
+
+The origin filters read `mainComponent.remote` and scan with Figma's native `findAllWithCriteria`. Telling *Library* from *Remote outside library* needs one library lookup per distinct component, so on a big page those two take a moment longer. Detached instances (no main component) match none of the origin filters. A library that is published but not enabled in the file may land under *Remote outside library*.
 
 Use it when a frame and a real component share a name and you only want one of them. The filter is **sticky**: it stays on your choice until you change it, and a **red dot** on the icon is the reminder that a search is narrowed.
 
-While **Replace** is on, this same menu relabels itself into Replace's own three choices instead — see [Replace scope](#replace-scope).
+While **Replace** is on, this same menu hides the three origin items and relabels itself into Replace's own three choices instead — see [Replace scope](#replace-scope).
 
 ### Visibility filter
 The radio group under the name field decides what a search looks at:
@@ -173,6 +178,11 @@ Buttons enable and disable themselves as your selection changes: *Set to absolut
 1. Filter icon → **Components only**
 2. Type the name → **Select**
 
+**Audit where components come from**
+1. Select the section or frames to check, or nothing for the whole page
+2. Leave the name field empty, filter icon → **Library components**, **Local components** or **Remote outside library**
+3. **Select** — every matching instance in scope is selected
+
 **Audit every hidden layer in a flow**
 1. Select the section or frames to check
 2. Leave the name field empty, pick **Hidden**
@@ -261,6 +271,14 @@ Version numbers live in `README.md` (title, release notes, footer), `package.jso
 
 
 ## RELEASE NOTES
+
+### v1.1.0-alpha
+**New Features:**
+- Component origin filters in the Selection scope menu: **Local components**, **Remote outside library** and **Library components**, for both Select and Select absolute. Uses the native Plugin API only — no external service
+- Origin scans use `findAllWithCriteria` instead of walking every node
+
+**UI Changes:**
+- The three origin items are hidden while Replace is on
 
 ### v1.0.9-alpha
 **UI Changes:**
@@ -418,4 +436,4 @@ For issues or feedback, please contact the plugin maintainer via GitHub.
 
 ---
 
-**Current Version**: v1.0.9-alpha
+**Current Version**: v1.1.0-alpha

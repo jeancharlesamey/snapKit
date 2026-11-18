@@ -2572,6 +2572,10 @@ body {
   cursor: default;
 }
 
+.snapkit-filter__item.is-hidden {
+  display: none;
+}
+
 /* --- toast ---------------------------------------------------------------- */
 
 .snapkit-toast {
@@ -2713,6 +2717,17 @@ body {
           </div>
           <div class="select-menu__item snapkit-filter__item" data-type="component">
             <span class="select-menu__item-icon"></span><span class="select-menu__item-label" id="filterLabelComponent">Components only</span>
+          </div>
+          <!-- Component origin filters. Hidden while Replace is on: its 3 slots
+               are scopes, and origin means nothing to a text search. -->
+          <div class="select-menu__item snapkit-filter__item snapkit-filter__item--origin" data-type="local-component">
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Local components</span>
+          </div>
+          <div class="select-menu__item snapkit-filter__item snapkit-filter__item--origin" data-type="remote-component">
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Remote outside library</span>
+          </div>
+          <div class="select-menu__item snapkit-filter__item snapkit-filter__item--origin" data-type="library-component">
+            <span class="select-menu__item-icon"></span><span class="select-menu__item-label">Library components</span>
           </div>
           <div class="select-menu__item snapkit-filter__item" data-type="non-component">
             <span class="select-menu__item-icon"></span><span class="select-menu__item-label" id="filterLabelNonComponent">Everything but components</span>
@@ -2903,11 +2918,9 @@ function setTypeFilter(value) {
     );
   }
   filterBtn.classList.toggle('is-active', value !== 'all');
-  filterBtn.title = value === 'component'
-    ? 'Selection scope: components only'
-    : value === 'non-component'
-      ? 'Selection scope: everything but components'
-      : 'Filter by selection scope';
+  filterBtn.title = value === 'all'
+    ? 'Filter by selection scope'
+    : 'Selection scope: ' + typeFilterPhrase(value);
 }
 
 // --- replace mode ------------------------------------------------------------
@@ -2926,6 +2939,11 @@ function updateFilterLabels() {
     filterLabelEls[key].textContent = labels[key];
   }
   filterDividerLabel.textContent = replaceMode ? 'Replace scope' : 'Selection scope';
+  for (var oi = 0; oi < filterOptions.length; oi++) {
+    if (filterOptions[oi].classList.contains('snapkit-filter__item--origin')) {
+      filterOptions[oi].classList.toggle('is-hidden', replaceMode);
+    }
+  }
 }
 
 // Fades .snapkit-selection-only in or out around Replace mode. Hiding waits
@@ -3051,12 +3069,17 @@ document.body.onclick = closeFilterPopover;
 
 // --- search feedback --------------------------------------------------------
 
-function typeFilterPhrase() {
-  return typeFilter === 'component'
-    ? 'components only'
-    : typeFilter === 'non-component'
-      ? 'everything but components'
-      : 'all types';
+var TYPE_FILTER_PHRASES = {
+  all: 'all types',
+  component: 'components only',
+  'local-component': 'local components only',
+  'remote-component': 'remote components outside library only',
+  'library-component': 'library components only',
+  'non-component': 'everything but components'
+};
+
+function typeFilterPhrase(value) {
+  return TYPE_FILTER_PHRASES[value || typeFilter] || TYPE_FILTER_PHRASES.all;
 }
 
 function visibilityPhrase() {

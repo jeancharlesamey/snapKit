@@ -211,10 +211,10 @@ test('the UI also resizes the window to fit its content on load', function() {
   assert.strictEqual(typeof resizeMsgs[0].height, 'number');
 });
 
-test('the filter menu offers exactly the three known element types', function() {
+test('the filter menu offers the known element types and the three origin filters', function() {
   var ui = loadUi();
   var types = ui.options.map(function(o) { return o.getAttribute('data-type'); });
-  assert.deepStrictEqual(types, ['all', 'component', 'non-component']);
+  assert.deepStrictEqual(types, ['all', 'component', 'local-component', 'remote-component', 'library-component', 'non-component']);
 });
 
 test('All types is preselected and the filter icon shows no active dot', function() {
