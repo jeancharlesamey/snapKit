@@ -233,6 +233,10 @@ body {
   cursor: default;
 }
 
+.snapkit-filter__item.is-hidden {
+  display: none;
+}
+
 /* --- toast ---------------------------------------------------------------- */
 
 .snapkit-toast {

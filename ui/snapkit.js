@@ -37,7 +37,7 @@ var filterLabelEls = {
   component: document.getElementById('filterLabelComponent'),
   'non-component': document.getElementById('filterLabelNonComponent')
 };
-var TYPE_FILTER_LABELS = { all: 'All types', component: 'Components only', 'non-component': 'Everything but components' };
+var TYPE_FILTER_LABELS = { all: 'All types', component: 'All components', 'non-component': 'Everything but components' };
 var REPLACE_SCOPE_LABELS = { all: 'Everywhere', component: 'In section and frames only', 'non-component': 'In text only' };
 var DATA_TYPE_TO_REPLACE_SCOPE = { all: 'everywhere', component: 'structure', 'non-component': 'text' };
 var REPLACE_SCOPE_TO_DATA_TYPE = { everywhere: 'all', structure: 'component', text: 'non-component' };
@@ -100,11 +100,9 @@ function setTypeFilter(value) {
     );
   }
   filterBtn.classList.toggle('is-active', value !== 'all');
-  filterBtn.title = value === 'component'
-    ? 'Selection scope: components only'
-    : value === 'non-component'
-      ? 'Selection scope: everything but components'
-      : 'Filter by selection scope';
+  filterBtn.title = value === 'all'
+    ? 'Filter by selection scope'
+    : 'Selection scope: ' + typeFilterPhrase(value);
 }
 
 // --- replace mode ------------------------------------------------------------
@@ -123,6 +121,11 @@ function updateFilterLabels() {
     filterLabelEls[key].textContent = labels[key];
   }
   filterDividerLabel.textContent = replaceMode ? 'Replace scope' : 'Selection scope';
+  for (var oi = 0; oi < filterOptions.length; oi++) {
+    if (filterOptions[oi].classList.contains('snapkit-filter__item--origin')) {
+      filterOptions[oi].classList.toggle('is-hidden', replaceMode);
+    }
+  }
 }
 
 // Fades .snapkit-selection-only in or out around Replace mode. Hiding waits
@@ -248,12 +251,17 @@ document.body.onclick = closeFilterPopover;
 
 // --- search feedback --------------------------------------------------------
 
-function typeFilterPhrase() {
-  return typeFilter === 'component'
-    ? 'components only'
-    : typeFilter === 'non-component'
-      ? 'everything but components'
-      : 'all types';
+var TYPE_FILTER_PHRASES = {
+  all: 'all types',
+  component: 'components only',
+  'local-component': 'components created in this file only',
+  'remote-component': 'components created in another file only',
+  'library-component': 'library components only',
+  'non-component': 'everything but components'
+};
+
+function typeFilterPhrase(value) {
+  return TYPE_FILTER_PHRASES[value || typeFilter] || TYPE_FILTER_PHRASES.all;
 }
 
 function visibilityPhrase() {
@@ -315,11 +323,8 @@ function showMessage(text, type) {
 // --- select -----------------------------------------------------------------
 
 selectBtn.onclick = function() {
+  // An empty field means "any name" — the plugin treats it as a wildcard.
   var name = frameNameInput.value.trim();
-  if (!name) {
-    showMessage('Please enter a component name', 'error');
-    return;
-  }
   showOverlay(searchContextText('select', name));
   parent.postMessage({ pluginMessage: { type: 'select-frame', name: name, typeFilter: typeFilter, visibility: visibilityFilter } }, '*');
 };

@@ -211,10 +211,10 @@ test('the UI also resizes the window to fit its content on load', function() {
   assert.strictEqual(typeof resizeMsgs[0].height, 'number');
 });
 
-test('the filter menu offers exactly the three known element types', function() {
+test('the filter menu offers the known element types and the three origin filters', function() {
   var ui = loadUi();
   var types = ui.options.map(function(o) { return o.getAttribute('data-type'); });
-  assert.deepStrictEqual(types, ['all', 'component', 'non-component']);
+  assert.deepStrictEqual(types, ['all', 'component', 'local-component', 'remote-component', 'library-component', 'non-component']);
 });
 
 test('All types is preselected and the filter icon shows no active dot', function() {
@@ -297,7 +297,7 @@ test('clicking the Replace toggle blurs it so the DS focus ring does not linger'
 test('the dropdown relabels itself for Replace mode, and reverts when Replace is turned off', function() {
   var ui = loadUi();
   assert.strictEqual(ui.el('filterLabelAll').textContent, 'All types');
-  assert.strictEqual(ui.el('filterLabelComponent').textContent, 'Components only');
+  assert.strictEqual(ui.el('filterLabelComponent').textContent, 'All components');
   assert.strictEqual(ui.el('filterLabelNonComponent').textContent, 'Everything but components');
   assert.strictEqual(ui.el('filterDividerLabel').textContent, 'Selection scope');
 
@@ -322,7 +322,7 @@ test('picking a dropdown option in Replace mode sets the replace scope, not the 
   ui.el('frameName').value = 'Header';
   ui.el('replaceWith').value = 'Banner';
   ui.click(ui.el('replaceAllBtn'));
-  assert.deepStrictEqual(ui.lastPosted(), { type: 'replace-all', name: 'Header', replaceWith: 'Banner', visibility: 'all', scope: 'structure' }, 'the "Components only" slot means the structure scope in Replace mode');
+  assert.deepStrictEqual(ui.lastPosted(), { type: 'replace-all', name: 'Header', replaceWith: 'Banner', visibility: 'all', scope: 'structure' }, 'the "All components" slot means the structure scope in Replace mode');
 });
 
 test('the type filter is untouched by picking a replace scope, and comes back once Replace is off', function() {
@@ -368,7 +368,7 @@ test('clicking an already-checked type filter toggles back to All types', functi
   var ui = loadUi();
   ui.click(ui.option('component'));
   ui.click(ui.option('component'));
-  assert.ok(ui.option('all').classList.contains('select-menu__item--selected'), 're-clicking Components only should fall back to All types');
+  assert.ok(ui.option('all').classList.contains('select-menu__item--selected'), 're-clicking All components should fall back to All types');
 });
 
 test('switching type filters never touches the name field', function() {

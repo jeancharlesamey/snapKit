@@ -34,6 +34,8 @@ function makeNode(spec) {
   if ('numberOfFixedChildren' in spec) node.numberOfFixedChildren = spec.numberOfFixedChildren;
   if ('characters' in spec) node.characters = spec.characters;
   if ('fontName' in spec) node.fontName = spec.fontName;
+  // Instances point at a main component: { remote: bool, key: string }
+  if ('mainComponent' in spec) node.mainComponent = spec.mainComponent;
 
   // Real TextNodes can mix fonts across a single string; the real API asks you
   // to load every font used in a range before editing it. This mock doesn't
@@ -69,6 +71,16 @@ function makeNode(spec) {
     for (var i = 0; i < node.children.length; i++) {
       node.children[i].parent = node;
     }
+    node.findAllWithCriteria = function(criteria) {
+      var out = [];
+      (function walk(n) {
+        (n.children || []).forEach(function(c) {
+          if (criteria.types.indexOf(c.type) !== -1) out.push(c);
+          if (c.children) walk(c);
+        });
+      })(node);
+      return out;
+    };
     node.insertChild = function(index, child) {
       if (child.parent && child.parent.children) {
         var cur = child.parent.children.indexOf(child);
@@ -97,6 +109,11 @@ function makeFigma(pageChildren) {
       scrollAndZoomIntoView: function() {}
     },
     showUI: function() {},
+    // Keys listed in figma._libraryKeys resolve (published library); others reject.
+    _libraryKeys: [],
+    importComponentByKeyAsync: function(key) {
+      return figma._libraryKeys.indexOf(key) !== -1 ? Promise.resolve({}) : Promise.reject(new Error('not found'));
+    },
     // Real Figma resolves this once the font is actually loaded, and rejects
     // for a font it can't find (deleted, or never installed). The mock
     // resolves immediately for anything else, but rejects for this one
